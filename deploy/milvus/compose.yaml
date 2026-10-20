@@ -1,0 +1,68 @@
+# 仅供本机使用：独立网络和目录，不使用任何课堂容器或数据卷。
+name: tayune-local
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: tayune-local-etcd
+    restart: unless-stopped
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    volumes:
+      - ./runtime/etcd:/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: tayune-local-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: minio server /minio_data
+    volumes:
+      - ./runtime/minio:/minio_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  milvus:
+    image: milvusdb/milvus:v2.4.4
+    container_name: tayune-local-milvus
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - ./runtime/milvus:/var/lib/milvus
+    ports:
+      # 只允许这台电脑访问，不向公司 WiFi 或公网开放数据库。
+      - "127.0.0.1:19532:19530"
+    depends_on:
+      etcd:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 10s
+      start_period: 90s
+      timeout: 5s
+      retries: 15
+
+networks:
+  default:
+    name: tayune-local-network

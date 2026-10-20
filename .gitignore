@@ -1,0 +1,45 @@
+.DS_Store
+.idea/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.env*
+!.env.example
+*.pem
+*.key
+*.p12
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+logs/
+data/generated/
+deploy/milvus/runtime/
+
+# Local reference versions stay on disk but are not project deliverables.
+*_1.*
+*_1
+
+# Local study notes and acceptance records; publish reviewed docs separately.
+/AGENTS.md
+/docs/*
+!/docs/public/
+/reports/
+/data/knowledge/
+/data/training/
+/models/
+/demo.py
+*.pt
+*.pth
+*.safetensors
+*.onnx
+
+# Placeholder tests are not a substitute for actual regression coverage.
+/tests/unit/test_placeholder.py
+/tests/integration/test_placeholder.py

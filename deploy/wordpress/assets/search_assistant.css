@@ -1,0 +1,11 @@
+/* 选择器限定站点搜索弹层，不覆盖商品或结账页面样式。 */
+#site-search .search-fields { flex-wrap: wrap; }
+#site-search #tayune-ai-results { margin-top: 20px; padding-top: 16px; border-top: 1px solid #b7c1b3; }
+#site-search #tayune-ai-results[hidden] { display: none; }
+#site-search #tayune-ai-results > p { font-size: 14px; line-height: 1.6; }
+#site-search .tayune-ai-messages { max-height: 36vh; overflow-y: auto; overscroll-behavior: contain; }
+#site-search .tayune-ai-message { padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+#site-search .tayune-ai-message.user { background: #e8ede3; }
+#site-search .tayune-ai-message.assistant { background: #f5f3ed; }
+#site-search #tayune-ai-results a { display: inline-block; margin: 4px 12px 4px 0; }
+#site-search [data-tayune-ai]:disabled { opacity: .6; cursor: wait; }

@@ -1,0 +1,9 @@
+# 可选重型依赖：只有本机运行 BGE-M3 / Reranker 时才安装。
+# 免费小内存云主机不适合直接加载 BGE-M3。
+transformers==4.51.0
+sentence-transformers==3.3.1
+sentencepiece==0.2.1
+torch==2.5.1
+FlagEmbedding>=1.2.0
+numpy==1.26.4
+

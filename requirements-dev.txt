@@ -1,0 +1,6 @@
+# 只在开发和测试环境安装。
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+ruff==0.9.10
+

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TAYUNE Tea Assistant</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f2e9;color:#26372d;font:16px/1.6 system-ui,sans-serif}
+main{max-width:680px;margin:30px auto;padding:24px}h1{font:32px/1.2 Georgia,serif;margin:0 0 10px}
+#messages{min-height:220px;max-height:50vh;overflow:auto;margin:24px 0}
+.message{background:white;padding:14px 18px;margin:12px 0;border-left:3px solid #9aab96;white-space:pre-wrap}
+.user{background:#e6eadf;border-color:#47644c}a{color:#315c3b}textarea{width:100%;min-height:80px;padding:12px;font:inherit;border:1px solid #a7b49e;border-radius:4px}
+button{padding:12px 20px;background:#31533b;color:white;border:0;border-radius:4px;font:inherit;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}#status{min-height:26px;font-size:14px}small{display:block;color:#59685c}
+@media(max-width:500px){main{margin:0;padding:18px}}
+</style></head>
+<body><main><h1>Your next cup starts here.</h1><p>Ask about our teas, brewing, or delivery policies.</p>
+<small>AI suggestions may be imperfect. Prices and availability are confirmed at checkout. Please do not share payment or personal details.</small>
+<div id="messages" role="log" aria-live="polite"></div>
+<form id="form"><label for="question">Your tea question</label><textarea id="question" maxlength="500" required></textarea>
+<button id="send" type="submit">Ask the tea assistant</button></form>
+<p id="status" role="status"></p><a href="https://tayunetea.com/contact/" id="contact">Contact the shop</a>
+</main>
+<script>
+// 本地演示使用同源；网站接入时替换为审核过的固定HTTPS隧道地址。
+const API_BASE = "";
+// 令牌保存在当前页面内存，刷新新开会话，避免浏览器共享设备留下会话凭据。
+let token = "";
+const form = document.getElementById("form");
+const status = document.getElementById("status");
+const send = document.getElementById("send");
+function show(text, user=false){
+  const node=document.createElement("div");node.className="message"+(user?" user":"");
+  // 模型输出作为文本，不用innerHTML，避免执行模型或文档里的HTML。
+  node.textContent=text;document.getElementById("messages").appendChild(node);
+  node.scrollIntoView({block:"nearest"});
+}
+async function request(path, body, bearer=""){
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),160000);
+  try{
+    const headers={"Content-Type":"application/json"};if(bearer)headers.Authorization="Bearer "+bearer;
+    const response=await fetch(API_BASE+path,{method:"POST",headers,body:JSON.stringify(body),signal:controller.signal});
+    if(response.status===401)token="";
+    if(!response.ok)throw new Error("Assistant unavailable");return await response.json();
+  }finally{clearTimeout(timer)}
+}
+form.addEventListener("submit",async event=>{
+  event.preventDefault();const question=document.getElementById("question").value.trim();if(!question)return;
+  send.disabled=true;status.textContent="Looking into your question…";show(question,true);
+  try{
+    if(!token)token=(await request("/api/session",{})).session_token;
+    const result=await request("/api/chat",{message:question},token);show(result.answer);
+    for(const source of result.sources||[]){
+      const url=new URL(source.url);
+      if(url.protocol!=="https:"||url.hostname!=="tayunetea.com")continue;
+      const link=document.createElement("a");link.href=url.href;link.textContent=source.title;
+      link.target="_blank";link.rel="noopener noreferrer";
+      const p=document.createElement("p");p.appendChild(link);document.getElementById("messages").appendChild(p);
+    }
+    status.textContent=result.degraded?"Some information could not be verified.":"";
+    document.getElementById("question").value="";
+  }catch(error){
+    // 电脑断电时后端无法降级，因此提示必须由浏览器自己显示；不自动重试扣费请求。
+    status.textContent="The tea assistant is unavailable. You can still browse and buy normally. Please contact the shop for help.";
+  }finally{send.disabled=false}
+});
+</script></body></html>

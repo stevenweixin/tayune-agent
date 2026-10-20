@@ -1,0 +1,35 @@
+# 核心依赖。版本优先与 EduAgent 课件保持一致，避免边学习边处理版本差异。
+
+# Web API 与流式响应
+fastapi==0.117.1
+uvicorn[standard]==0.32.1
+sse-starlette==2.1.3
+
+# 配置和数据校验
+pydantic==2.11.4
+pydantic-settings==2.11.0
+python-dotenv==1.0.1
+
+# HTTP：调用 DeepSeek 和 WooCommerce
+httpx==0.28.1
+tenacity==9.0.0
+
+# LangChain / LangGraph
+langchain==1.2.10
+langchain-core==1.2.16
+langchain-openai==1.1.10
+langchain-text-splitters==1.1.1
+langgraph==1.0.9
+langgraph-prebuilt==1.0.8
+
+# PostgreSQL
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+
+# Milvus / Zilliz
+pymilvus==2.4.9
+# pymilvus 2.4.9 仍使用 pkg_resources；新版 setuptools 已移除此模块。
+setuptools==80.9.0
+# pymilvus 的 environs 9.x 需要 marshmallow 3.x 的版本接口。
+environs==9.5.0
+marshmallow==3.26.1
