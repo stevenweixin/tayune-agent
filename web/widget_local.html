@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TAYUNE Local Agent Check</title>
+  <style>
+    body { margin: 0; background: #edf0e8; color: #26352c; font: 16px/1.7 system-ui, sans-serif; }
+    main { max-width: 660px; margin: 8vh auto; padding: 24px; }
+    h1 { font: 42px/1.2 Georgia, serif; }
+    .notice { padding: 18px; border: 1px solid #bac9ad; background: #f8faf5; }
+    li { margin: 12px 0; }
+    a { color: #315b34; }
+  </style>
+</head>
+<body>
+  <main>
+    <p>TAYUNE / LOCAL VERIFICATION ONLY</p>
+    <h1>Check the real tea companion.</h1>
+    <p class="notice">This page uses the production widget and real local Agent. Sending a question calls DeepSeek and uses the existing daily request budget. Public website chat remains disabled.</p>
+    <ol>
+      <li>Open the sphere in the lower-right corner.</li>
+      <li>Send one question and wait for the response. Check its sources.</li>
+      <li>Wait at least 8 seconds after the previous request before a follow-up.</li>
+    </ol>
+    <p>Do not share personal or payment details. Reloading starts a new conversation; it does not reset the daily budget.</p>
+    <p><a href="/health/ready" target="_blank" rel="noopener noreferrer">Local readiness check</a></p>
+  </main>
+  <script>
+    // 仅这个本机页面开启聊天；没有修改WordPress的chatEnabled=false。
+    // 使用相对路径走8011同源接口，不需要额外CORS来源或中转服务器。
+    window.TAYUNE_TEA_COMPANION = {
+      apiBase: '',
+      chatEnabled: true,
+      homePage: false,
+      contactUrl: 'https://tayunetea.com/policies/shipping-returns/#contact-policy',
+      privacyUrl: 'https://tayunetea.com/policies/privacy-policy/',
+      shopUrl: 'https://tayunetea.com/shop/'
+    };
+  </script>
+  <script src="/demo/assets/tea_companion.js"></script>
+</body>
+</html>

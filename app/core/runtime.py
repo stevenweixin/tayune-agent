@@ -15,6 +15,7 @@ from app.integrations.woocommerce import WooCommerceClient
 from app.agent.product_tool import build_product_tools
 from app.agent.knowledge_tool import build_knowledge_tool
 from app.agent.graph import build_graph
+from app.agent.intent_review import IntentReviewer
 from app.core.cpu_worker import CPUWorker
 from app.database.session import SessionStore
 
@@ -30,7 +31,7 @@ class Runtime:
         self.cpu = CPUWorker()
         self.classifier = None
         self.graph = None
-
+        self.intent_reviewer = None
     async def start(self):
         # 只在服务入口加载，环境变量优先，兼容已完成Milvus配置读取函数。
         load_dotenv(ROOT / ".env", override=False) # override=False:如果环境变量已存在,不覆盖。部署时服务器设置的环境变量优先于本地文件。
@@ -44,10 +45,10 @@ class Runtime:
         from langchain_openai import ChatOpenAI
         # SDK重试参数必须在创建时设置；复制已创建对象不一定改变内部HTTP客户端。
         llm = ChatOpenAI(model=config["DEEPSEEK_MODEL"], api_key=config["DEEPSEEK_API_KEY"],
-                         base_url = config["DEEPSEEK_BASE_URL"], max_retries=0, timeout=25, # 不自动重试
-                         max_tokens= 512, use_responses_api =False,# DeepSeek 兼容传统的 Chat Completions 接口格式,而不是 OpenAI 较新的 Responses 接口
-                         http_client = self.sync_http,
-                         http_async_client = self.http, extra_body={"thinking":{"type":"disabled"}})
+            base_url=config["DEEPSEEK_BASE_URL"], max_retries=0, timeout=25,
+            max_tokens=512, use_responses_api=False, http_client=self.sync_http,
+            http_async_client=self.http, extra_body={"thinking": {"type": "disabled"}})
+        self.intent_reviewer = IntentReviewer(llm)
         self.graph = build_graph(ToolModel(llm,tools),tools)
 
     def load_models(self):
@@ -58,13 +59,12 @@ class Runtime:
         from app.rag.reranker import BGEReranker
         from app.rag.query_classifier import QueryClassifier
         from scripts.build_knowledge_base import MODEL_PATH
-        model_path = Path(os.getenv("TAYUNE_BGE_MODEL_PATH",str(MODEL_PATH)))
-        rerank_path = Path(os.getenv("TAYUNE_RERANK_MODEL_PATH",str(model_path.parent / "bge-reranker-large")))
-        self.milvus = connect_client()  #  连接向量数据库
-        embeddings =HybridBGEmbeddings(model_path)   # 加载向量模型
-        HybridTeaVectorStore(self.milvus,embeddings).prepare_collection(create=False) # 校验集合存在
+        model_path = Path(os.getenv("TAYUNE_BGE_MODEL_PATH", str(MODEL_PATH)))
+        rerank_path = Path(os.getenv("TAYUNE_RERANK_MODEL_PATH", str(model_path.parent / "bge-reranker-large")))
+        self.milvus = connect_client()
+        embeddings = HybridBGEmbeddings(model_path)
+        HybridTeaVectorStore(self.milvus, embeddings).prepare_collection(create=False)
         return QueryClassifier(), HybridRetriever(self.milvus, embeddings), BGEReranker(rerank_path)
-
     async def close(self):  # 后创建的、被依赖的,先关;和启动顺序大致相反。
         await self.cpu.close()
         if self.milvus is not None:

@@ -1,0 +1,20 @@
+# Replace the tunnel ID and credentials path on the deployment computer.
+# Never commit the actual credentials file or expose Milvus through this tunnel.
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /absolute/private/path/YOUR_TUNNEL_ID.json
+protocol: http2
+metrics: 127.0.0.1:0
+no-autoupdate: true
+ingress:
+  - hostname: agent.tayunetea.com
+    path: ^/health/(live|ready)$
+    service: http://127.0.0.1:8011
+    originRequest:
+      connectTimeout: 5s
+  - hostname: agent.tayunetea.com
+    path: ^/api/(session|chat)$
+    service: http://127.0.0.1:8011
+    originRequest:
+      connectTimeout: 5s
+  # Demo pages, OpenAPI and every other route stay private.
+  - service: http_status:404

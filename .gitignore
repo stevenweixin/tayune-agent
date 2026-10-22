@@ -21,6 +21,8 @@ htmlcov/
 logs/
 data/generated/
 deploy/milvus/runtime/
+deploy/.cloudflare-local/
+node_modules/
 
 # Local reference versions stay on disk but are not project deliverables.
 *_1.*
