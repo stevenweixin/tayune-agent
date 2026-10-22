@@ -15,6 +15,7 @@ class TeaState(TypedDict, total=False):
     # 图只处理一次请求，会话历史由服务层SQLite保存，避免旧工具消息无限累积。
     messages: list[BaseMessage]
     answer: str
+    answer_parts: list[dict]
     summary: str
     tool_count: int
     model_count: int

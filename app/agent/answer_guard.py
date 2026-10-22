@@ -1,11 +1,14 @@
 """
 输入：模型最终文本、本轮工具登记的来源。
-输出：answer、sources、degraded；不合格时抛出 ValueError，让图决定是否纠正。
+输出：answer、answer_parts、sources、degraded；不合格时抛出 ValueError，让图决定是否纠正。
 这是项目自己的普通 Python 校验，不是 LangChain API，也不是事实正确性评分器。
 
 """
 
 import re
+
+# 只识别项目约定的来源编号，不把模型自己编写的网址变成可点击链接。
+REFERENCE = re.compile(r"\[([^\[\]\n]{1,240})\]\(source:(S[1-9][0-9]*)\)|\[(S[1-9][0-9]*)\]")
 
 
 FALLBACK = "I couldn't verify enough information right now. Please try again later or use the shop's contact page."
@@ -38,6 +41,10 @@ An approved internal guide can have source_id with url=null. It is valid evidenc
 not a public webpage. Cite its source_id normally; the server adds a plain-text
 reference title instead of a clickable link. Never invent a URL for that guide.
 An internal guide for another tea is not evidence of the requested tea's own recipe.
+When naming a product or public document, make its title an inline source link:
+[Short product or document title](source:S1). Use only the current tool's source_id.
+Do not write actual URLs. The server supplies the registered URL. Ordinary [S1]
+citations remain valid; do not add a separate Sources list at the bottom.
 
 When no factual answer is appropriate, output ONLY one exact code below, no other text:
 <reply:greeting> : greeting only
@@ -71,6 +78,7 @@ def check_answer(text: str, candidates: list[dict]) -> dict:
     if answer in SHORT_REPLIES:
         return {
             "answer": SHORT_REPLIES[answer],
+            "answer_parts": [{"text": SHORT_REPLIES[answer]}],
             "sources": [],
             "degraded": answer == "<reply:unavailable>",
         }
@@ -79,9 +87,12 @@ def check_answer(text: str, candidates: list[dict]) -> dict:
         raise ValueError("invalid_reply_code")
 
     # 正则只识别固定格式的引用编号，不尝试用正则理解冲泡知识。
-    markers = re.findall(r"\[S[1-9][0-9]*\]", answer)
-    if not markers:
+    references = list(REFERENCE.finditer(answer))
+    if not references:
         raise ValueError("missing_citations")
+    remaining = REFERENCE.sub("", answer)
+    if "](source:" in remaining:
+        raise ValueError("invalid_inline_link")
 
     sources_by_id = {}
     for source in candidates:
@@ -90,8 +101,9 @@ def check_answer(text: str, candidates: list[dict]) -> dict:
     selected = []
     seen_ids = set()
     internal_titles = []
-    for marker in markers:
-        source_id = marker[1:-1]  # [S1] 去掉两端方括号，得到 S1。
+    for reference in references:
+        # 前两个捕获组是“标题链接”的文字和ID；第三个是旧格式[S1]的ID。
+        source_id = reference.group(2) or reference.group(3)
         if source_id not in sources_by_id:
             raise ValueError("unknown_source_id")
         if source_id not in seen_ids:
@@ -100,13 +112,40 @@ def check_answer(text: str, candidates: list[dict]) -> dict:
                 selected.append({"title": source["title"], "url": source["url"]})
             elif source["title"] not in internal_titles:
                 # 内部指南可以被引用，但不能把文件路径/片段编号伪装成网页链接。
-                # 只展示已审核的文档标题，sources字段仍只含真实可点击网页，前端不用改。
+                # 只展示已审核的文档标题，sources字段仍只含真实可点击网页。
                 internal_titles.append(source["title"])
             seen_ids.add(source_id)
 
-    answer = re.sub(r"\[S[1-9][0-9]*\]", "", answer).strip()
-    if not answer:
+    plain_answer = REFERENCE.sub(lambda match: match.group(1) or "", answer).strip()
+    if not plain_answer:
         raise ValueError("empty_answer")
+
+    explicit_links = set()
+    for reference in references:
+        if reference.group(2):
+            explicit_links.add(reference.group(2))
+    parts = []
+    linked_ids = set()
+    cursor = 0
+    for reference in references:
+        if reference.start() > cursor:
+            parts.append({"text": answer[cursor:reference.start()]})
+        source_id = reference.group(2) or reference.group(3)
+        source = sources_by_id[source_id]
+        if reference.group(1):
+            part = {"text": reference.group(1)}
+            if source["url"]:
+                part["url"] = source["url"]
+                linked_ids.add(source_id)
+            parts.append(part)
+        elif source["url"] and source_id not in explicit_links and source_id not in linked_ids:
+            # 兼容旧[S1]回答：把引用标题放在该句旁边，而不是集中到底部。
+            parts.extend([{"text": " ("}, {"text": source["title"], "url": source["url"]}, {"text": ")"}])
+            linked_ids.add(source_id)
+        cursor = reference.end()
+    if cursor < len(answer):
+        parts.append({"text": answer[cursor:]})
     if internal_titles:
-        answer += "\n\nShop reference (internal guide; no public link): " + "; ".join(internal_titles)
-    return {"answer": answer, "sources": selected, "degraded": False}
+        parts.append({"text": "\n\nShop reference (internal guide; no public link): " + "; ".join(internal_titles)})
+    answer = "".join(part["text"] for part in parts).strip()
+    return {"answer": answer, "answer_parts": parts, "sources": selected, "degraded": False}

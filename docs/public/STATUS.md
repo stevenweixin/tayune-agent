@@ -2,7 +2,7 @@
 
 Updated: 2026-10-22.
 
-The website widget 1.2.0 and Agent API are available as a small public pilot. Two authorized website smoke cases passed on October 22. The backend remains locally hosted, without an availability guarantee.
+The website widget 1.3.0 and Agent API are available as a small public pilot. The initial two website smoke cases and one separately authorized inline-link update case passed on October22. The backend remains locally hosted, without an availability guarantee.
 
 ## Implemented
 
@@ -17,8 +17,11 @@ The website widget 1.2.0 and Agent API are available as a small public pilot. Tw
 - Product scope and USD budget filtering, with citation selection from registered source IDs.
 - One bounded, tool-free intent review for classifier-restricted requests; public requests can continue to the existing graph.
 - A final-answer citation gate with fixed source-free clarification replies and at most one correction cycle within the existing model/tool budgets.
+- SSE delivery of the completed, validated answer and structured inline title links. This is not native model token streaming; initial generation wait is unchanged. Legacy JSON clients remain supported.
 
 ## Validation and Remaining Work
+
+- The1.3.0 update passed84 Python and7 Node offline checks. A fixed-data browser fixture demonstrated incremental display; one real website question verified completion and inline product links after deployment. No public-network intermediate frame or first-text benchmark was captured. See [release details](RELEASE.md).
 
 - The first three authorized local browser smoke cases exposed an unsourced brewing follow-up. After implementing the citation gate, three separately authorized retests returned a product/budget answer and an opened-tea policy answer matching the inspected public pages. The brewing follow-up invoked knowledge tools but safely degraded after invalid/missing citations. At that stage the brewing task remained unresolved; the subsequent fix and retest are described below. These six smoke cases are not an accuracy benchmark.
 - Subsequent inspection identified URL-less internal guides and omitted product-description text as evidence-path gaps. Both were fixed: real chunk IDs identify internal evidence, while product detail retains the supplied brewing text. Three separately authorized local widget cases then passed: a budget product query, its product-specific mug-brewing follow-up and an internal ripe-pu-erh guide. See [evidence fix and retest](EVIDENCE_FIX.md). These cases are not an accuracy benchmark.

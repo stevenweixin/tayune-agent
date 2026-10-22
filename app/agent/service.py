@@ -113,6 +113,7 @@ class TeaService:
             if source["url"] not in seen:
                 seen.add(source["url"])
                 sources.append(source)
-        return {"answer": answer, "sources": sources[:10], "degraded": state.get("degraded", False),
+        return {"answer": answer, "answer_parts": state.get("answer_parts") or [{"text": answer}],
+                "sources": sources[:10], "degraded": state.get("degraded", False),
                 "trace": state.get("trace", []), "usage": {"input_tokens": state.get("input_tokens", 0),
                     "output_tokens": state.get("output_tokens", 0)}}

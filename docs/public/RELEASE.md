@@ -1,8 +1,16 @@
 # Public Pilot Release
 
-Updated: 2026-10-22. Status: small public pilot activated; two website smoke cases passed.
+Updated: 2026-10-22. Status: small public pilot, widget 1.3.0 deployed.
 
-The deployed site uses widget 1.2.0 with chat enabled. The existing tunnel now forwards the exact `/api/session` and `/api/chat` paths in addition to health checks. Activation was explicitly approved; no new paid service was added.
+The deployed site uses widget 1.3.0 with chat enabled. The existing tunnel forwards the exact `/api/session` and `/api/chat` paths in addition to health checks. Activation was explicitly approved; no new paid service was added.
+
+## 1.3.0 Incremental Delivery Update
+
+The same chat endpoint negotiates JSON or SSE using `Accept`. After the existing answer gate completes, `meta`, structured `delta` and `done` events progressively deliver the validated answer. This is not native LLM token streaming and does not shorten the initial retrieval/generation wait. Partial unvalidated drafts are not released.
+
+Product/document titles are inline links resolved from registered source IDs, never model-invented URLs. Legacy citations remain supported at their sentence location. The separate bottom source list is removed. The widget renders React text/link nodes, permits only HTTPS shop URLs, and reports interrupted streams without automatic retries.
+
+84 Python and7 Node checks passed, alongside PHP syntax and production build checks. A fixed-data browser fixture showed partial text while streaming and complete inline links afterward; it made no model requests. Exactly one separately authorized question was sent through the anonymous real website after deployment: two loose-leaf teas below USD50 were returned, with Jasmine USD19.90 and Dong Ding USD45.90 linked in the body. The answer was not degraded, and the daily counter changed17 to18. The live capture occurred after completion, so no public-network first-text latency or chunk cadence was measured. This is not a general accuracy benchmark. The original two-case pilot acceptance below remains historical evidence for1.2.0.
 
 ## Scope
 

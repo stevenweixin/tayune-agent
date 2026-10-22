@@ -9,13 +9,14 @@ from ipaddress import ip_address
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException,Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from app.core.runtime import Runtime, ROOT
 from app.agent.service import TeaService
 from app.api.schemas.chat import ChatInput
 from app.core.logger import setup_logging
 from app.api.request_limits import BodyLimitMiddleware
 from app.api.rate_limit import RequestRateLimiter,get_visitor_ip
+from app.api.answer_stream import stream_answer
 
 def create_app(runtime_factory = Runtime):
     @asynccontextmanager
@@ -46,7 +47,7 @@ def create_app(runtime_factory = Runtime):
         response = await call_next(request)
         if request.url.path in ("/api/session", "/api/chat"):
             # 返回值含会话凭据或回答，浏览器和代理不应复用缓存。
-            response.headers["Cache-Control"] = "no-store"
+            response.headers.setdefault("Cache-Control", "no-store")
         return response
 
     def check_origin(request):
@@ -113,6 +114,11 @@ def create_app(runtime_factory = Runtime):
         # 工具轨迹只留后端/测试使用，不向用户展示工程细节。
         result.pop("trace", None)
         result["request_id"] = request_id
+        # 相同接口按Accept协商；保留旧JSON客户端，不增加公网路径或重复计费请求。
+        # 完整门禁通过后才开始发答案，拒绝把可能被纠正的草稿Token先暴露出去。
+        if "text/event-stream" in request.headers.get("accept", ""):
+            return StreamingResponse(stream_answer(result), media_type="text/event-stream",
+                headers={"Cache-Control": "no-store, no-transform", "X-Accel-Buffering": "no"})
         return result
 
     @api.get("/demo")

@@ -44,12 +44,12 @@ svg { flex-shrink: 0; }
 .coming-soon-links a:hover { color: #526d3b; }
 .message { margin-bottom: 22px; }
 .message-name { display: block; font-size: 9px; letter-spacing: .15em; color: #657454; margin-bottom: 8px; }
-.message p { font-size: 13px; line-height: 1.75; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.message p, .answer-text { font-size: 13px; line-height: 1.75; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.answer-text a { color: #284c2d; text-decoration: underline; text-underline-offset: 3px; }
+.answer-text a:hover { color: #182e1b; }
+.incomplete-note { display: block; margin-top: 10px; font-size: 11px; }
 .message-user { background: #e9eddf; padding: 13px 15px; border-radius: 10px 10px 2px 10px; margin-left: 30px; }
 .message-assistant { padding-right: 8px; }
-.sources { display: grid; gap: 9px; margin-top: 16px; }
-.sources a { display: flex; align-items: flex-start; gap: 6px; font-size: 11px; line-height: 1.6; color: #405f3d; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
-.sources svg { margin-top: 2px; }
 .thinking { display: flex; align-items: center; gap: 4px; color: #637157; padding: 4px 0 12px; }
 .thinking > span:not(.thinking-label) { width: 4px; height: 4px; border-radius: 50%; background: #687b54; animation: thinking .9s ease-in-out infinite alternate; }
 .thinking > span:nth-child(2) { animation-delay: .2s; }
