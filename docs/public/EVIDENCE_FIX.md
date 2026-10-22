@@ -35,11 +35,28 @@ The same 33 checks also passed in an isolated snapshot containing the repository
 
 A preceding read-only public API check confirmed that the selected product's description contained its mug-brewing recipe and that the extraction path retained it. That check was not an Agent answer evaluation.
 
-The earlier live retest confirmed that the citation gate could safely degrade a brewing answer, but the final product-description/internal-reference changes have not yet been retested with the live model. No additional paid model requests were made for this verification.
+At the original fix commit, offline checks were complete but the final changes had not yet been retested with the live model. The subsequent authorized retest is recorded below.
+
+## Controlled Live Retest
+
+Three separately authorized questions were sent through the production widget on the loopback-only test page, in one new conversation. Testing stopped after the third question. Public chat was not enabled.
+
+| Case | Observed result | Actual successful tool calls |
+| --- | --- | --- |
+| Oolong below USD50, excluding teaware | Returned Dong Ding 500g at USD45.90, in stock, with its product source; inspected product page matched these details. Complete catalog recall was not assessed. | Three product searches |
+| Follow-up: how to brew that tea in a mug | Resolved the prior product, retrieved its details, and answered approximately 3g per 250ml for 2–3 minutes. The current product page supports that recipe. The answer distinguished the separate gongfu recipe and did not invent a mug temperature. | One product search and one detail lookup |
+| Ripe pu-erh in a 100ml gaiwan, using the internal guide if available | Returned the guide's 5–6g, 95–100°C and initial pour at 10–15 seconds, with an internal-reference title and no fabricated link or exposed local path. Checked against the approved guide. | One knowledge lookup |
+
+All three completed without degradation. Classifier-to-completion log intervals were approximately 6.64s, 5.11s and 9.28s respectively; these are not precise browser end-to-end timings or performance benchmarks. No browser warnings/errors were captured during this retest.
+
+An independent, read-only direct product-API check failed once with an unavailable-service result. The actual Agent detail lookup succeeded, and the current public product page was inspected for verification. These smoke cases do not establish sustained service availability.
+
+The request summary's existing `tools` value counts trace entries, including classification and answer validation. The actual tool counts above use the individual tool-stage records, not that summary number.
 
 ## Remaining Limits
 
 - Valid citation IDs prove reference membership, not that every statement or recipe number is supported by the cited text.
 - An internal guide for one tea cannot establish another tea's product-specific recipe.
 - Long descriptions may be truncated; unseen instructions remain unknown.
-- Real-model tool selection, recipe grounding and broader business cases still require controlled validation before public release.
+- The targeted product/mug/internal-guide cases passed, but broader business, safety, failure and public-deployment cases still require controlled validation before release.
+- Answers remain verbose, and the mug answer unnecessarily displayed a public product ID. The internal-guide answer could more clearly distinguish gaiwan capacity from actual water volume; these checks are not a general language-quality assessment.
