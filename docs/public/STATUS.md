@@ -2,7 +2,7 @@
 
 Updated: 2026-10-22.
 
-The website widget 1.3.0 and Agent API are available as a small public pilot. The initial two website smoke cases and one separately authorized inline-link update case passed on October22. The backend remains locally hosted, without an availability guarantee.
+The website widget 1.3.1 and Agent API are available as a small public pilot. The initial two website smoke cases and one separately authorized inline-link update case passed on October22. A subsequent mobile orb compatibility patch is deployed; original iPhone confirmation remains pending. The backend remains locally hosted, without an availability guarantee.
 
 ## Implemented
 

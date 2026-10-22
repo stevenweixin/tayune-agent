@@ -1,8 +1,14 @@
 # Public Pilot Release
 
-Updated: 2026-10-22. Status: small public pilot, widget 1.3.0 deployed.
+Updated: 2026-10-22. Status: small public pilot, widget 1.3.1 deployed.
 
-The deployed site uses widget 1.3.0 with chat enabled. The existing tunnel forwards the exact `/api/session` and `/api/chat` paths in addition to health checks. Activation was explicitly approved; no new paid service was added.
+The deployed site uses widget 1.3.1 with chat enabled. The existing tunnel forwards the exact `/api/session` and `/api/chat` paths in addition to health checks. Activation was explicitly approved; no new paid service was added.
+
+## 1.3.1 Mobile Orb Compatibility
+
+An iPhone Safari screenshot showed a white rectangle around the orb. It was not reproduced in the available browser, so the exact platform cause remains unconfirmed. The patch removes the canvas filter, draws the shadow on a separate circular layer, explicitly clips the canvas to its sphere and resets native button appearance. The WebGL context and shader now consistently use premultiplied alpha, with transparent clearing before drawing.
+
+The production build, PHP syntax and7 existing protocol tests passed. Local320px/393px panels fit their viewports; the deployed393px website loaded1.3.1 without a visible rectangle and retained open/close and pause/resume controls. These are viewport checks, not an iPhone hardware acceptance. Original-device confirmation remains pending. No chat/model requests, backend restart or budget changes were made.
 
 ## 1.3.0 Incremental Delivery Update
 

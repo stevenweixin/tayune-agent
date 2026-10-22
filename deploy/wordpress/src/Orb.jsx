@@ -63,7 +63,9 @@ const fragmentSource = `
     float highlight = glow(p, vec2(-0.36, 0.54), vec2(0.72, 0.38));
     color = mix(color, vec3(1.0), highlight * 0.52);
     color += (hash(gl_FragCoord.xy) - 0.5) * 0.009;
-    gl_FragColor = vec4(clamp(color, 0.0, 1.0), mask * 0.96);
+    // 与画布的预乘Alpha约定一致；透明区域RGB也归零，避免合成时带出底色。
+    float alpha = mask * 0.96;
+    gl_FragColor = vec4(clamp(color, 0.0, 1.0) * alpha, alpha);
   }
 `;
 
@@ -79,7 +81,7 @@ function compileShader(gl, type, source) {
 }
 
 function createPainter(canvas) {
-  const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: false });
+  const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false });
   if (!gl) {
     // 不支持WebGL时仍保留可点击入口；这是静态降级，不假装动效已正常运行。
     canvas.dataset.renderer = 'unavailable';
@@ -114,6 +116,8 @@ function createPainter(canvas) {
       }
       gl.uniform1f(timeLocation, time);
       gl.uniform1f(tintLocation, tint === 'tea' ? 1 : 0);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       frames += 1;
       canvas.dataset.frames = String(frames);

@@ -16,6 +16,7 @@ app = FastAPI()
 @app.get("/")
 async def index():
     return HTMLResponse("""<!doctype html><html lang="en"><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Local SSE fixture</title><body style="background:#e9e5da;padding:40px">
     <h1>LOCAL FIXTURE - NO MODEL CALLS</h1><p>Fixed data, not live product information.</p>
     <script>window.TAYUNE_TEA_COMPANION = {apiBase:location.origin,chatEnabled:true,

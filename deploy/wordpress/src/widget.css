@@ -7,16 +7,17 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 button:focus-visible, a:focus-visible { outline: 2px solid #6f805a; outline-offset: 3px; }
 a { color: inherit; }
 svg { flex-shrink: 0; }
-.orb-canvas { display: block; width: 100%; height: 100%; }
+.orb-canvas { display: block; width: 100%; height: 100%; background: transparent; border-radius: 50%; clip-path: circle(44.5% at 50% 50%); }
 .assistant-widget { position: fixed; z-index: 9000; right: max(22px, env(safe-area-inset-right)); bottom: var(--widget-bottom); --widget-bottom: max(18px, env(safe-area-inset-bottom)); --launcher-size: 86px; color: #17251b; font-size: 14px; line-height: 1.5; text-align: left; }
 /* 首页视频的暂停按钮也在右下角，只在首页为它留出空间。 */
 .assistant-widget.widget-home { --widget-bottom: max(62px, env(safe-area-inset-bottom)); }
 .launcher-row { height: var(--launcher-size); }
-.orb-launcher { position: relative; width: var(--launcher-size); display: flex; flex-direction: column; align-items: center; border: 0; padding: 0; background: transparent; border-radius: 16px; transition: transform .25s; }
+.orb-launcher { -webkit-appearance: none; appearance: none; position: relative; width: var(--launcher-size); display: flex; flex-direction: column; align-items: center; border: 0; padding: 0; background: transparent; border-radius: 50%; transition: transform .25s; }
 .orb-visual { display: block; position: relative; width: var(--launcher-size); height: var(--launcher-size); }
+/* 阴影由独立圆形层绘制，避免给透明WebGL画布叠加filter合成层。 */
+.orb-visual::before { content: ''; position: absolute; inset: 6%; border-radius: 50%; box-shadow: 0 3px 9px rgb(0 0 0 / .15); pointer-events: none; }
 .orb-launcher:hover { transform: scale(1.06); }
 .orb-launcher:active { transform: scale(.97); }
-.orb-launcher .orb-canvas { filter: drop-shadow(0 3px 9px rgb(0 0 0 / .15)); }
 .launcher-chevron { position: absolute; inset: 0; display: grid; place-items: center; color: #354334; pointer-events: none; }
 .orb-fallback { display: none; }
 .orb-visual:has(canvas[data-renderer='unavailable']) { background: #dce2cd; border: 1px solid #8d9a7e; border-radius: 50%; }
