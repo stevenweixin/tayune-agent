@@ -1,8 +1,8 @@
 # Public Pilot Release
 
-Updated: 2026-10-22. Status: prepared, not publicly activated.
+Updated: 2026-10-22. Status: small public pilot activated; two website smoke cases passed.
 
-The deployed site still uses widget1.1.2 with chat disabled. The repository contains release candidate1.2.0 with chat enabled; uploading it and opening the tunnel API paths remain separate deployment actions.
+The deployed site uses widget 1.2.0 with chat enabled. The existing tunnel now forwards the exact `/api/session` and `/api/chat` paths in addition to health checks. Activation was explicitly approved; no new paid service was added.
 
 ## Scope
 
@@ -23,11 +23,24 @@ The existing local computer hosts the FastAPI backend, CPU models, isolated Milv
 
 Origin checks and CORS are not authentication. These controls limit costs and scope but do not prevent distributed abuse or guarantee claim-level factual correctness.
 
-## Prepared Verification
+## Verification
 
 70 formal offline checks passed: answer gate14, product/internal evidence19, local widget/timeout6, API entry9, reranker windows10, intent review/service12. These do not load production models or measure real-answer accuracy. PHP syntax and the production frontend build passed.
 
-Three authorized local widget cases passed after the evidence fix; details and limits are recorded in[EVIDENCE_FIX.md](EVIDENCE_FIX.md). Public-site question acceptance is pending and must not be inferred from localhost tests.
+Three authorized local widget cases passed after the evidence fix; details and limits are recorded in [EVIDENCE_FIX.md](EVIDENCE_FIX.md).
+
+After activating the pilot, exactly two authorized questions were submitted from an anonymous browser at `https://tayunetea.com/`, using the deployed widget and public HTTPS API:
+
+| Case | Observed path and result |
+| --- | --- |
+| Loose-leaf oolong below USD 50, excluding teaware | One successful product search; Dong Ding 500g at USD 45.90, in stock and purchasable, with a product link. The inspected current product page matched these details. Complete catalog recall was not assessed. |
+| Return policy for opened tea | One successful policy knowledge lookup, six recalled candidates and three reranked passages. The answer stated that opened tea cannot be returned and linked the policies. The published shipping/returns text supports the stated terms. |
+
+Both completed with `degraded=False`. Classifier-to-completion log spans were approximately 4.30s and 8.90s; these are not browser end-to-end benchmarks. The request summary's `tools` value includes non-tool trace entries; actual tool counts above use tool-stage records.
+
+The persisted daily chat counter increased from 9 to 11, and testing stopped after the second question. No browser warnings/errors were captured. Public readiness and CORS preflight returned 200; chat without a session returned 401 with `no-store`; public demo and OpenAPI returned 404. The visible widget identifies DeepSeek, session expiry and the privacy page.
+
+This is acceptance of the initial low-traffic request path, not a claim of general answer accuracy, full security coverage or sustained availability. Broad safety evaluation and offline-device behavior were not live-tested in this release; existing offline guards and fallback checks remain in place. No third-party subscription, database rebuild or classroom-service change was made.
 
 ## Operator Steps
 
