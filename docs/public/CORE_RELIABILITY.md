@@ -1,8 +1,10 @@
 # Core Reliability Update
 
-Date: 2026-10-23. Status: **1.4.0 candidate, not deployed**.
-The live widget remains 1.3.1 until a separate deployment and real-request acceptance.
-No model/environment upgrade, production Milvus write or paid model request was performed for this update.
+Date: 2026-10-23. Status: **backend candidate running; widget1.4.0 not deployed**.
+The operator restarted the backend and authorized three local real-model questions.
+Their execution paths completed, but evidence-grounding gaps remain; see
+[local acceptance](LOCAL_ACCEPTANCE.md). The website widget remains1.3.1.
+No model/environment upgrade or production Milvus write was performed.
 
 ## Problems and Changes
 
@@ -83,7 +85,7 @@ python -m scripts.audit_runs
 
 The 32 English cases exercise the real graph, tool gateway, product-tool wrapper and answer gate against scripted model/catalog/knowledge fixtures. They cover product scope/budget, policies, brewing, dependencies, unavailable services, invalid inputs, unknown tools and citation failure. They do **not** measure the classifier, model semantic decisions, live retrieval relevance or factual correctness. A 32/32 execution-contract result is not 100% customer task success.
 
-Live checks are opt-in and reject execution without both `--mode live --allow-paid` and `--max-cases 1..3`. They call the existing local server, not another Runtime. Only single-turn business cases are eligible; injected failures remain replay-only. Live output still needs human evidence review. This implementation run made no live calls.
+Live checks are opt-in and reject execution without both `--mode live --allow-paid` and `--max-cases 1..3`. They call the existing local server, not another Runtime. Only single-turn business cases are eligible; injected failures remain replay-only. Live output still needs human evidence review. Initial implementation made no live calls; a separate authorized three-question same-session acceptance was subsequently performed and recorded in LOCAL_ACCEPTANCE.md.
 
 ## Remaining Boundaries
 

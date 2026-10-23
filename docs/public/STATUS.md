@@ -2,7 +2,7 @@
 
 Updated: 2026-10-23.
 
-The 1.4.0 reliability candidate is implemented and offline-validated, **not deployed**. It adds bounded task plans/checkpoints, session-scoped idempotency, model/tool gateways, explicit preferences and local management, minimized execution audit, 32 English contract replays and immutable knowledge releases. 125 Python checks, 7 Node checks and the widget build passed. No paid requests or real Milvus release operations were performed. See [scope and remaining boundaries](CORE_RELIABILITY.md). The live system described below remains the previously deployed pilot.
+The 1.4.0 reliability backend candidate is running after an operator restart; the1.4.0 widget is **not deployed**. It adds bounded task plans/checkpoints, session-scoped idempotency, model/tool gateways, explicit preferences and local management, minimized execution audit, 32 English contract replays and immutable knowledge releases. 125 Python checks, 7 Node checks and the widget build passed. Three separately authorized local real-model questions completed; manual review found unsupported answer elaborations, so full grounding acceptance has not passed. Nine free local management checks passed. No real Milvus release operation was performed. See [local acceptance and remaining issues](LOCAL_ACCEPTANCE.md) and [implementation scope](CORE_RELIABILITY.md).
 
 The website widget 1.3.1 and Agent API are available as a small public pilot. The initial two website smoke cases and one separately authorized inline-link update case passed on October22. A subsequent mobile orb compatibility patch is deployed; original iPhone confirmation remains pending. The backend remains locally hosted, without an availability guarantee.
 
