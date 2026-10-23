@@ -48,7 +48,7 @@ def create_chat_model(config, sync_client, async_client):
     return ChatOpenAI(
         model=config["DEEPSEEK_MODEL"], api_key=config["DEEPSEEK_API_KEY"],
         base_url=config["DEEPSEEK_BASE_URL"], timeout=REQUEST_TIMEOUT,
-        max_retries=1, max_tokens=MAX_OUTPUT_TOKENS, use_responses_api=False,
+        max_retries=0, max_tokens=MAX_OUTPUT_TOKENS, use_responses_api=False,
         http_client=sync_client, http_async_client=async_client,
         # 普通摘要/问答先关闭思考模式，避免小输出预算全用于推理；以平台支持为准。
         extra_body={"thinking": {"type": "disabled"}},
@@ -58,8 +58,8 @@ def create_chat_model(config, sync_client, async_client):
 async def generate_text(messages: list) -> dict:
     """输入LangChain文本消息；输出text、usage和elapsed_seconds。
 
-    await等待网络期间可让其他协程运行，不等于无限并发。SDK最多重试一次，
-    不再套Tenacity叠加重试；重试不能保证没有重复计费。
+    await等待网络期间可让其他协程运行，不等于无限并发。SDK重试关闭，
+    网关仅对可恢复的服务错误重试一次；重试不能保证没有重复计费。
     HTTP各阶段30秒不等于整次操作30秒，因此另设65秒总等待上限。
     """
     if not messages or len(messages) > 20:
@@ -84,7 +84,9 @@ async def generate_text(messages: list) -> dict:
         with httpx.Client(trust_env=False) as sync_client:
             async with httpx.AsyncClient(trust_env=False) as async_client:
                 llm = create_chat_model(config, sync_client, async_client)
-                response = await asyncio.wait_for(llm.ainvoke(messages), timeout=TOTAL_TIMEOUT)
+                from app.integrations.model_gateway import ModelGateway
+                gateway = ModelGateway({"summary": llm}, {"summary": config["DEEPSEEK_MODEL"]})
+                response = await asyncio.wait_for(gateway.invoke("summary", messages), timeout=TOTAL_TIMEOUT)
     except ImportError:
         raise RuntimeError("缺少langchain-openai，请按本节说明在tayune_agent环境安装") from None
     except Exception as error:

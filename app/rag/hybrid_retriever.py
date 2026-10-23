@@ -1,5 +1,5 @@
 """
-5.6 混合召回参考版：复用正式双向量集合，只检索不写入。
+混合召回：从启动时选定的双向量集合检索，不写入。
 
 输入问题，返回 [(LangChain Document, 排序分数), ...]。
 
@@ -25,9 +25,12 @@ from app.rag.hybrid_embeddings import HybridBGEmbeddings
 from app.rag.hybrid_vector_store import COLLECTION
 
 class HybridRetriever:
-    def __init__(self,client,embeddings:HybridBGEmbeddings):
+    def __init__(self,client,embeddings:HybridBGEmbeddings, collection_name=COLLECTION, knowledge_version="legacy", releases=None):
         self.client = client
         self.embeddings = embeddings
+        self.collection = collection_name
+        self.knowledge_version = knowledge_version
+        self.releases = releases
 
     def search(self,query:str,top_k:int=10, source_type: str | None = None) -> list[tuple[Document,float]]:
         """两路各取 top_k 个候选,再融合选出最多 top_k 个不同记录."""
@@ -56,7 +59,7 @@ class HybridRetriever:
             )
             # 权重顺序对应reqs 顺序
             results = self.client.hybrid_search(
-                collection_name = COLLECTION,
+                collection_name=self.collection,
                 reqs=[dense_request,sparse_request],
                 ranker=WeightedRanker(0.7, 0.3),
                 limit= top_k, output_fields=["text","metadata"],timeout=30,
@@ -64,7 +67,7 @@ class HybridRetriever:
         else:
             # 问题没有非零词项时只做稠密检索,不能伪造token来凑稀疏请求
             results = self.client.search(
-                collection_name = COLLECTION,data=[dense], anns_field="dense_vector",
+                collection_name=self.collection,data=[dense], anns_field="dense_vector",
                 filter = expression,
                 search_params = {"metric_type":"COSINE","params":{}},
                 limit=top_k, output_fields= ["text","metadata"],timeout= 30,
@@ -73,9 +76,14 @@ class HybridRetriever:
         documents = []
         if not results:
             return documents
+        revoked = set(self.releases.revoked_documents()) if self.releases else set()
         for hit in results[0]:
             entity = hit["entity"]
+            # 撤回立即作用于后续检索，不等整库重建；过滤后可能不足top_k，不伪称无相关知识。
+            if entity["metadata"].get("document_id") in revoked:
+                continue
             document = Document(page_content=entity["text"],metadata = entity["metadata"])
+            document.metadata["knowledge_version"] = self.knowledge_version
             documents.append((document,float(hit["distance"])))
         # 混合分数与回退的余弦分数含义不同; 都只用于当前查询排序,不能当正确率
         return documents

@@ -22,6 +22,7 @@ export function Widget({ config }) {
   const panelRef = useRef(null);
   const logRef = useRef(null);
   const messageIdRef = useRef(0);
+  const retryRef = useRef(null);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
   useEffect(() => {
@@ -45,6 +46,7 @@ export function Widget({ config }) {
     // 禁止请求途中重置：浏览器取消不代表服务器已取消，不能借此重复收费调用。
     if (busyRef.current) return;
     tokenRef.current = '';
+    retryRef.current = null;
     setMessages([]);
     setDraft('');
     setNotice('');
@@ -72,6 +74,10 @@ export function Widget({ config }) {
         const seconds = Number(response.headers.get('Retry-After'));
         setCooldown(Number.isFinite(seconds) && seconds > 0 ? Math.min(Math.ceil(seconds), 600) : 10);
         throw new Error('The assistant is busy or its request limit has been reached. Please wait and try later, or contact the shop.');
+      }
+      if (response.status === 409) {
+        retryRef.current = null;
+        throw new Error('That earlier request cannot be reused. Please send your question again to verify current information.');
       }
       if (!response.ok) throw new Error('The tea assistant is unavailable right now. You can still browse and buy normally, or contact the shop.');
       if (onEvent && response.headers.get('Content-Type')?.includes('text/event-stream')) {
@@ -102,7 +108,11 @@ export function Widget({ config }) {
         if (typeof session.session_token !== 'string' || !session.session_token) throw new Error('Could not start a conversation. Please try again later.');
         tokenRef.current = session.session_token;
       }
-      const result = await post('/api/chat', { message: clean }, ({ event, data }) => {
+      // 同会话、同问题在网络失败后沿用请求ID；服务端可重放结果而不再次扣次/调用模型。
+      if (!retryRef.current || retryRef.current.text !== clean || retryRef.current.token !== tokenRef.current) {
+        retryRef.current = { text: clean, token: tokenRef.current, id: crypto.randomUUID() };
+      }
+      const result = await post('/api/chat', { message: clean, request_id: retryRef.current.id }, ({ event, data }) => {
         if (event === 'meta') {
           setThinking(false);
           setStreaming(true);
@@ -121,6 +131,7 @@ export function Widget({ config }) {
         setMessages(previous => [...previous, { id: answerId, role: 'assistant', parts }]);
       }
       if (result.degraded) setNotice('Some information could not be verified. Please check the linked pages or contact the shop.');
+      retryRef.current = null;
     } catch (error) {
       setMessages(previous => previous.map(message => message.id === answerId
         ? { ...message, incomplete: true } : message));
@@ -128,7 +139,7 @@ export function Widget({ config }) {
       setNotice(error.name === 'AbortError' || error instanceof TypeError
         ? 'The assistant could not be reached in time. Please try later or contact the shop. Your shopping is not affected.'
         : error.message);
-      // 不自动重试：第一次请求可能已被服务器处理，重试可能重复消耗日额度。
+      // 不自动重试；用户主动重试同问题时保留ID，改问题或重建会话时生成新ID。
     } finally {
       busyRef.current = false;
       setThinking(false);

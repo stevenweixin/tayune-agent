@@ -81,6 +81,7 @@ def check_answer(text: str, candidates: list[dict]) -> dict:
             "answer_parts": [{"text": SHORT_REPLIES[answer]}],
             "sources": [],
             "degraded": answer == "<reply:unavailable>",
+            "evidence_ids": [],
         }
     if "<reply:" in answer:
         # 必须完整匹配代码；“代码 + 未核验配方”不能作为安全短句放行。
@@ -148,4 +149,5 @@ def check_answer(text: str, candidates: list[dict]) -> dict:
     if internal_titles:
         parts.append({"text": "\n\nShop reference (internal guide; no public link): " + "; ".join(internal_titles)})
     answer = "".join(part["text"] for part in parts).strip()
-    return {"answer": answer, "answer_parts": parts, "sources": selected, "degraded": False}
+    return {"answer": answer, "answer_parts": parts, "sources": selected, "degraded": False,
+            "evidence_ids": sorted(seen_ids)}

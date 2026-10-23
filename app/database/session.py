@@ -16,6 +16,7 @@ DELETE FROM ... WHERE	    删除	清理过期会话
 """
 
 import json
+import os
 import secrets
 import sqlite3
 import time
@@ -27,11 +28,15 @@ class SessionStore:
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path)
+        os.chmod(path, 0o600)
         self.db.execute("CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, updated REAL, data TEXT)")
         self.db.execute("CREATE TABLE IF NOT EXISTS budget (day TEXT PRIMARY KEY, count INTEGER)")
         self.db.commit()
+        self.runs = None
 
     def cleanup(self):
+        if self.runs is not None:
+            self.runs.cleanup()
         self.db.execute("DELETE FROM sessions WHERE updated < ?", (time.time() - 86400,))
         self.db.commit()
 
@@ -40,7 +45,8 @@ class SessionStore:
         if self.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] >= 100:
             raise RuntimeError("会话已满")
         token = secrets.token_urlsafe(32)
-        self.save(token, {"summary": "", "history": [], "known_product_ids": [], "last_request": 0})
+        self.save(token, {"summary": "", "history": [], "known_product_ids": [], "last_request": 0,
+                          "preferences": {}})
         return token
 
     def get(self, token):
@@ -63,3 +69,9 @@ class SessionStore:
 
     def close(self):
         self.db.close()
+
+    def delete(self, token):
+        if self.runs is not None:
+            self.runs.erase(token)
+        self.db.execute("DELETE FROM sessions WHERE token=?", (token,))
+        self.db.commit()

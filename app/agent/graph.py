@@ -8,13 +8,14 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from time import perf_counter
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END
-from pydantic import ValidationError
 from app.agent.state import TeaState
 from app.agent.answer_guard import FALLBACK, REPAIR_PROMPT, check_answer
 from app.core.logger import setup_logging
+from app.core.execution import current_execution
+from app.agent.plan import StepSpec, WorkflowPlan
+from app.agent.tool_gateway import ToolGateway
 
 logger = logging.getLogger("tayune_agent.graph")
 
@@ -30,6 +31,10 @@ def register_source(sources: list[dict], title: str, url: str | None,
             return source["source_id"]
     source_id = "S" + str(len(sources) + 1)
     sources.append({"source_id": source_id, "title": title, "url": url, "evidence_key": key})
+    execution = current_execution()
+    if execution:
+        from app.core.execution import fingerprint
+        execution.event("evidence", source_id=source_id, evidence_hash=fingerprint(key), has_public_url=bool(url))
     return source_id
 
 
@@ -40,6 +45,7 @@ def build_graph(model, tools):
     allowed = {}
     for item in tools:
         allowed[item.name] = item
+    gateway = ToolGateway(tools)
 
     async def decide(state):
         if state.get("model_count", 0) >= 4:
@@ -84,36 +90,41 @@ def build_graph(model, tools):
         known = list(state.get("known_product_ids", []))
         sources = list(state.get("sources", []))
         trace = list(state.get("trace", []))
-        for call in response.tool_calls:
+        execution = current_execution()
+        # 每轮由原生tool_calls生成小计划，不为简单寒暄额外调用一次Planner模型。
+        # 同轮读取互不依赖；详情必须使用前一轮搜索已核验的ID，不能猜测未来的结果。
+        steps = []
+        for call in response.tool_calls[:max(0, 4 - count)]:
+            if call["name"] in allowed:
+                steps.append(StepSpec(id=call["id"], tool=call["name"], args=call["args"]))
+        plan = WorkflowPlan(goal=state.get("goal") or "Answer the public tea-shop request using verified evidence",
+                            constraints=state.get("constraints", {}), steps=steps)
+        plan.validate_business()
+        if execution:
+            execution.event("plan", steps=[{"id": step.id, "tool": step.tool, "depends_on": step.depends_on} for step in steps])
+
+        async def run_call(call, permitted):
+            if not permitted:
+                return {"ok": False, "data": None, "error": "tool_budget_exhausted"}
+            return await gateway.invoke(call, known)
+
+        # 最多两路工具读取并发，CPUWorker仍串行；结果按原请求顺序归并，保持来源编号稳定。
+        if len(steps) == len(response.tool_calls):
+            completed = await gateway.execute_plan(plan, list(known))
+            results = [completed[call["id"]] for call in response.tool_calls]
+        else:
+            jobs = []
+            for index, call in enumerate(response.tool_calls):
+                jobs.append(run_call(call, count + index < 4))
+            results = await asyncio.gather(*jobs)
+        for call, result in zip(response.tool_calls, results):
             name, args = call["name"], call["args"]
-            started = perf_counter()
-            # 未知名称也来自模型，不把它原样写进日志；参数和 ToolMessage 正文也不记。
             log_name = name if name in allowed else "unknown_tool"
-            logger.info("stage=tool status=start name=%s used=%d", log_name, count)
-            result = {"ok": False, "error": "tool_not_allowed"}
-            if count >= 4:
-                result = {"ok": False, "error": "tool_budget_exhausted"}
-            else:
-                count += 1
-                if name in allowed:
-                    if name == "get_product" and args.get("product_id") not in known:
-                        result = {"ok": False, "error": "search_for_product_id_first"}
-                    else:
-                        try:
-                            result = await asyncio.wait_for(allowed[name].ainvoke(args), timeout=40)
-                        except ValidationError:
-                            result = {"ok": False, "error": "invalid_arguments"}
-                        except asyncio.TimeoutError:
-                            # 超时与一般异常分开；CPUWorker 的 shield 可能让推理线程继续完成。
-                            result = {"ok": False, "error": "tool_timeout"}
-                        except Exception as error:
-                            logger.warning("stage=tool status=exception name=%s error_type=%s",
-                                           log_name, type(error).__name__)
-                            result = {"ok": False, "error": "tool_unavailable"}
-            logger.info("stage=tool status=%s name=%s error=%s elapsed=%.3fs used=%d",
+            count = min(count + 1, 4)
+            logger.info("stage=tool status=%s name=%s error=%s used=%d",
                         "ok" if result.get("ok") else "failed", log_name,
-                        result.get("error", "none"), perf_counter() - started, count)
-            trace.append(name + (":ok" if result.get("ok") else ":failed"))
+                        result.get("error", "none"), count)
+            trace.append(log_name + (":ok" if result.get("ok") else ":failed"))
             if result.get("ok"):
                 if name == "search_products":
                     for product in result["data"]["products"]:
@@ -131,7 +142,7 @@ def build_graph(model, tools):
             messages.append(ToolMessage(content=json.dumps(result, ensure_ascii=False),
                                         tool_call_id=call["id"], name=name))
         return {"messages": messages, "tool_count": count, "known_product_ids": known[-100:],
-                "sources": sources, "trace": trace}
+                "sources": sources, "trace": trace, "plan": plan.model_dump()}
 
     def route(state):
         if state.get("answer"):
@@ -143,11 +154,29 @@ def build_graph(model, tools):
         # repair_count和model_count共同限制循环，原service的12步上限仍足够。
         return "model"
 
+    async def model_node(state):
+        update = await decide(state)
+        execution = current_execution()
+        if execution:
+            merged = {**state, **update}
+            execution.event("model_decision", next_node=route(merged),
+                            tool_requests=len(getattr(merged["messages"][-1], "tool_calls", [])),
+                            degraded=merged.get("degraded", False))
+            execution.checkpoint(merged, route(merged))
+        return update
+
+    async def tools_node(state):
+        update = await execute_tools(state)
+        execution = current_execution()
+        if execution:
+            execution.checkpoint({**state, **update}, "model")
+        return update
+
     builder = StateGraph(TeaState)
-    builder.add_node("model", decide)
-    builder.add_node("tools", execute_tools)
-    builder.add_edge(START, "model")
+    builder.add_node("model", model_node)
+    builder.add_node("tools", tools_node)
+    builder.add_conditional_edges(START, lambda state: state.get("resume_node") or "model")
     builder.add_conditional_edges("model", route)
     builder.add_edge("tools", "model")
-    # 本图每次请求新建State；会话服务保存精简Human/AI历史，不保存所有工具中间步骤。
+    # SQLite执行检查点与会话历史分离；恢复入口只由后端创建，客户端不能提交State。
     return builder.compile()

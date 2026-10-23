@@ -1,11 +1,4 @@
-"""Agent 状态定义。
-
-TODO：
-1. 先画出每个节点真正需要的数据。
-2. 定义用户问题、意图、需求条件、商品、文档、答案和错误字段。
-3. 需要累加的列表再使用 Reducer，不要所有字段都累加。
-4. 避免把第三方客户端对象放进 State。
-"""
+"""单次问答的消息、预算、计划、证据和恢复状态；不存第三方客户端。"""
 
 from typing import TypedDict
 from langchain_core.messages import BaseMessage
@@ -28,3 +21,12 @@ class TeaState(TypedDict, total=False):
     sources: list[dict]
     trace: list[str]
     degraded: bool
+    plan: dict
+    resume_node: str
+    dialogue: list[dict]
+    evidence_started_at: float
+    goal: str
+    constraints: dict
+    evidence_ids: list[str]
+    session_revision: float
+    memory_revision: int

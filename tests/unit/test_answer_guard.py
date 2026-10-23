@@ -61,7 +61,7 @@ class FakeKnowledge:
 
     async def ainvoke(self, args):
         return {"ok": True, "passages": [{
-            "title": "Brewing guide", "url": "https://example.com/brewing",
+            "title": "Brewing guide", "url": "https://tayunetea.com/brewing",
             "content": "Use the mug method and remove the infuser.",
         }]}
 

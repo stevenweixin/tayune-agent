@@ -56,7 +56,7 @@ def split_history(messages:list, threshold:int = 10, keep_rounds: int= 2 ) -> di
     return {"older":dialogue[:older_count],"recent":system_messages + recent}
 
 async def compress_history(messages: list, previous_summary:str = "",
-                           threshold: int = 10, keep_rounds:int=2) -> dict:
+                           threshold: int = 10, keep_rounds:int=2, generator=None) -> dict:
     """返回summary、messages、status和usage，不原地修改输入。
 
     status: unchanged未触发 / summarized成功 / failed失败。
@@ -81,7 +81,8 @@ async def compress_history(messages: list, previous_summary:str = "",
         result.update(status = "failed", reason="摘要输入超出当前客户端预算")
         return result
     try:
-        response = await generate_text([
+        generate = generator or generate_text
+        response = await generate([
             SystemMessage(content=SUMMARY_PROMPT),
             HumanMessage(content=payload),
         ])

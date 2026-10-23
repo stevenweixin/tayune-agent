@@ -17,6 +17,7 @@ from app.core.logger import setup_logging
 from app.api.request_limits import BodyLimitMiddleware
 from app.api.rate_limit import RequestRateLimiter,get_visitor_ip
 from app.api.answer_stream import stream_answer
+from app.core.preferences import PreferencePatch, update_preferences
 
 def create_app(runtime_factory = Runtime):
     @asynccontextmanager
@@ -45,7 +46,7 @@ def create_app(runtime_factory = Runtime):
             return JSONResponse({"detail": "Request too large"}, status_code=413,
                                 headers={"Cache-Control": "no-store"})
         response = await call_next(request)
-        if request.url.path in ("/api/session", "/api/chat"):
+        if request.url.path.startswith("/api/"):
             # 返回值含会话凭据或回答，浏览器和代理不应复用缓存。
             response.headers.setdefault("Cache-Control", "no-store")
         return response
@@ -74,7 +75,7 @@ def create_app(runtime_factory = Runtime):
         runtime = request.app.state.runtime
         try:
             from app.rag.hybrid_vector_store import COLLECTION
-            exists = await runtime.cpu.run(runtime.milvus.has_collection,COLLECTION)
+            exists = await runtime.cpu.run(runtime.milvus.has_collection, getattr(runtime, "knowledge_collection", COLLECTION))
             if not exists:
                 raise RuntimeError("collection missing")
         except Exception:
@@ -102,15 +103,24 @@ def create_app(runtime_factory = Runtime):
             raise HTTPException(422,"Invalid input")
         request_id = secrets.token_hex(8)
         try:
-            result = await request.app.state.service.chat(token,body.message.strip())
+            if body.request_id:
+                result = await request.app.state.service.chat(token,body.message.strip(), request_key=body.request_id)
+            else:
+                result = await request.app.state.service.chat(token,body.message.strip())
         except LookupError:
             raise HTTPException(401, "Session expired") from None
         except RuntimeError:
             raise HTTPException(429, "Assistant is busy or its request limit was reached") from None
+        except ValueError as error:
+            if str(error) == "stale_request_result":
+                raise HTTPException(409, "Earlier evidence expired; send a new request to verify current information") from None
+            raise HTTPException(409, "Request identifier was already used for a different message") from None
         # 日志只记摘要指标；不记录问题、摘要、session_token和SDK原异常。
+        request_id = result.get("task_id", request_id)
         logger = setup_logging(ROOT / "logs/agent.log")
         logger.info("request=%s degraded=%s tools=%d usage=%s", request_id,result["degraded"],
-                    len(result.get("trace",[])),result.get("usage"))
+                    result.get("tool_count", sum(item.startswith(("search_products:", "get_product:", "search_knowledge:"))
+                                                for item in result.get("trace", []))),result.get("usage"))
         # 工具轨迹只留后端/测试使用，不向用户展示工程细节。
         result.pop("trace", None)
         result["request_id"] = request_id
@@ -135,6 +145,81 @@ def create_app(runtime_factory = Runtime):
         local_host = request.url.hostname in ("127.0.0.1", "localhost", "::1")
         if not local_peer or not local_host or "cf-connecting-ip" in request.headers:
             raise HTTPException(404, "Not found")
+
+    def local_session(request, authorization):
+        # 运维/记忆管理接口暂不经Tunnel公开；即使本机也须提供所属会话的Bearer凭据。
+        check_local_widget(request)
+        token = authorization[7:] if authorization.startswith("Bearer ") else ""
+        if not token or len(token) > 100 or request.app.state.runtime.sessions.get(token) is None:
+            raise HTTPException(401, "Session expired")
+        return token
+
+    @api.get("/api/local/memory")
+    async def inspect_memory(request: Request, authorization: str = Header(default="")):
+        token = local_session(request, authorization)
+        data = request.app.state.runtime.sessions.get(token)
+        return {"preferences": data.get("preferences", {}), "summary": data["summary"],
+                "history": data["history"], "expires_after_idle_seconds": 86400}
+
+    @api.post("/api/local/memory")
+    async def correct_memory(body: PreferencePatch, request: Request, authorization: str = Header(default="")):
+        token = local_session(request, authorization)
+        if request.app.state.service.lock.locked():
+            raise HTTPException(409, "Finish or cancel the current request first")
+        store = request.app.state.runtime.sessions
+        data = store.get(token)
+        data["preferences"] = update_preferences(data.get("preferences", {}), body)
+        data["memory_revision"] = data.get("memory_revision", 0) + 1
+        store.save(token, data)
+        return {"preferences": data["preferences"]}
+
+    @api.delete("/api/local/memory")
+    async def delete_memory(request: Request, authorization: str = Header(default="")):
+        token = local_session(request, authorization)
+        if request.app.state.service.lock.locked():
+            raise HTTPException(409, "Finish or cancel the current request first")
+        request.app.state.runtime.sessions.delete(token)
+        # 删除不会退还每日次数，也不会删除其他会话。旧token随即失效。
+        return {"status": "deleted"}
+
+    @api.get("/api/local/tasks/{run_id}")
+    async def inspect_task(run_id: str, request: Request, authorization: str = Header(default="")):
+        token = local_session(request, authorization)
+        try:
+            saved = request.app.state.runtime.runs.get(token, run_id)
+        except LookupError:
+            raise HTTPException(404, "Task not found") from None
+        return {"task_id": run_id, "status": saved["status"], "versions": saved["versions"],
+                "counters": saved["counters"], "events": request.app.state.runtime.runs.audit(run_id)}
+
+    @api.get("/api/local/request/{request_key}")
+    async def request_task(request_key: str, request: Request, authorization: str = Header(default="")):
+        token = local_session(request, authorization)
+        try:
+            saved = request.app.state.runtime.runs.by_request_key(token, request_key)
+        except LookupError:
+            raise HTTPException(404, "Task not found") from None
+        return {"task_id": saved["id"], "status": saved["status"]}
+
+    @api.post("/api/local/tasks/{run_id}/cancel")
+    async def cancel_task(run_id: str, request: Request, authorization: str = Header(default="")):
+        token = local_session(request, authorization)
+        try:
+            return request.app.state.service.cancel(token, run_id)
+        except LookupError:
+            raise HTTPException(404, "Task not found") from None
+
+    @api.post("/api/local/tasks/{run_id}/resume")
+    async def resume_task(run_id: str, request: Request, authorization: str = Header(default="")):
+        token = local_session(request, authorization)
+        try:
+            result = await request.app.state.service.resume(token, run_id)
+        except LookupError:
+            raise HTTPException(404, "Task not found") from None
+        except (ValueError, RuntimeError):
+            raise HTTPException(409, "Cannot resume safely; start a new request") from None
+        result.pop("trace", None)
+        return result
 
     @api.get("/demo/widget")
     async def widget_demo(request: Request):

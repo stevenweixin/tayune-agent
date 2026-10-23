@@ -12,14 +12,17 @@ DESCRIPTION = "TAYUNE BGE-M3 FlagEmbedding dense+sparse v1"
 
 
 class HybridTeaVectorStore:
-    def __init__(self,client,embeddings:HybridBGEmbeddings):
+    def __init__(self,client,embeddings:HybridBGEmbeddings, collection_name=COLLECTION):
         self.client = client
         self.embeddings = embeddings
+        from app.rag.knowledge_releases import check_collection_name
+        check_collection_name(collection_name)
+        self.collection = collection_name
 
     def prepare_collection(self,* , create:bool =False) -> None:
         """已有集合检查后加载；只有 create=True 才允许创建新集合。"""
-        if self.client.has_collection(collection_name=COLLECTION):
-            description = self.client.describe_collection(collection_name=COLLECTION)
+        if self.client.has_collection(collection_name=self.collection):
+            description = self.client.describe_collection(collection_name=self.collection)
             if description.get("description") != DESCRIPTION:
                 raise ValueError("同名集合不是本模块的双向量集合，拒绝使用，不自动删除")
             # 在数据库入口核对结构，避免把旧稠密集合当成双向量集合。
@@ -49,12 +52,12 @@ class HybridTeaVectorStore:
                 metric_type="IP",params={"drop_ratio_build":0.0},
             )
             self.client.create_collection(
-                collection_name=COLLECTION,schema=schema,
+                collection_name=self.collection,schema=schema,
                 index_params=indexes,consistency_level="Strong",
             )
         else:
             raise ValueError("双向量集合不存在，请先运行对应建库入口")
-        self.client.load_collection(collection_name=COLLECTION)
+        self.client.load_collection(collection_name=self.collection)
 
     def add_documents(self,chunks:list[Document],batch_size:int =4) -> int:
         """正文列表交给双向量模型，再把两种向量与原片段一起写入。"""
@@ -85,7 +88,7 @@ class HybridTeaVectorStore:
                     "review_status":chunk.metadata["review_status"],
                     "source_type":chunk.metadata["source_type"],
                 })
-            result = self.client.upsert(collection_name =COLLECTION,data=rows,timeout=60)
+            result = self.client.upsert(collection_name=self.collection,data=rows,timeout=60)
             if result.get("upsert_count") != len(rows):
                 raise RuntimeError("本批双向量入库数量异常")
             written += len(rows)
