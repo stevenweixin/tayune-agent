@@ -104,3 +104,41 @@ option precedence, ignored none, actual SDK request construction with MockTransp
 and a graph with review plus four reads. No further real-model request was made.
 The budget fix requires a new restart and authorized retest. Neither the shopping
 task nor the extractive format is marked live-accepted by this failed attempt.
+
+## October24 Restarted Budget Patch — Partial Acceptance
+
+After a further restart and separate authorization for at most two requests, the
+running code hash matched `b0b1fc5`. Both chat POSTs were sent in one new session,
+with no automatic retries. This is loopback JSON acceptance, not a browser/SSE test.
+
+The same shopping question completed in5.784s, HTTP200, `completed`, `degraded=false`:
+one jasmine tea, listedUSD19.90 and in stock. The actual model response selected
+S1/E1 and S1/E2 as JSON. Re-rendering against the actual tool messages reproduced
+the returned answer and answer_parts exactly. The title was an inline link to the
+registered product URL. Price and availability matched the stored original tool
+result. There were no extra recipes, conversions or caffeine claims in this answer.
+It is a short product/price/stock response, not a detailed explanation of taste fit.
+
+The model used short jasmine/oolong searches; jasmine matched, oolong was empty.
+Review plus two main calls used three physical model calls and two tool reads,
+with5734 input and179 output tokens. The classifier still returned restricted0.901,
+recovered by PUBLIC review. No forced-finalization event was emitted: the last-call
+budget branch remains verified offline only, not by this live case.
+
+The mug follow-up returnedHTTP429 in0.002s with the generic busy/limit detail. The
+script sent it immediately after the5.784s first answer, before the service's eight
+seconds between request starts had elapsed. This was a test-pacing error, not a
+failed brewing/tool/model response. It created no task, called no model, added no
+history pair and did not consume another daily question. Daily count went1to2;
+history contains only one human/assistant pair. The rejected POST was not resent.
+
+The private one-off verifier now waits at least8.25s between same-session dispatches
+for future runs, but its existing-report guard prevents re-running this paid test.
+The backend cooldown, quota and production runtime code were not changed. No plugin,
+Milvus, environment or tunnel operation was performed. The test session remains
+under normal retention so a separately authorized single follow-up can use it.
+
+Conclusion: this real shopping example exercised and passed the extractive format,
+evidence-to-output rendering and inline-link checks. It does not establish general
+semantic accuracy, the finalization branch, or the unprocessed mug follow-up.
+The full two-turn path remains incomplete; any additional POST needs authorization.
