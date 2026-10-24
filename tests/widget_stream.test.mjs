@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendDelta, readChatStream, safeParts, safeShopUrl } from '../deploy/wordpress/src/chat_protocol.js';
+import { appendDelta, readChatStream, safeParts, safeShopUrl, CHAT_TIMEOUT_MS } from '../deploy/wordpress/src/chat_protocol.js';
+
+test('chat timeout covers generation and bounded stream delivery with network margin', () => {
+  assert.equal(CHAT_TIMEOUT_MS, 115000);
+  assert.ok(CHAT_TIMEOUT_MS >= 85000 + (12000 / 12) * 20 + 5000);
+});
 
 const event = (name, data) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
 function responseFrom(text, step = 1) {

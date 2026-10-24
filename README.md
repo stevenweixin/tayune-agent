@@ -8,6 +8,8 @@
 
 2026-10-24：正式图使用证据单元选择与服务端原文渲染，限制模型自行补写；补入末次模型收尾约束和短关键词提示。用户重启后，一组“选茶→同会话杯泡追问”本机真实案例通过：商品价格/库存、标题内链和冲泡原文均核对一致。此前预算耗尽和验收脚本触发冷却的记录保留，没有绕过限额或自动追加付费重试。152项Python、7项Node及32条离线契约重放通过；不是整体准确率或新版网站SSE验收。本例未真实触发强制收尾，资料正确性/相关性仍需评估。见[回答约束与取舍](docs/public/CORE_RELIABILITY.md#extractive-answer-contract)及[完成后的两轮记录](docs/public/LOCAL_ACCEPTANCE.md#october24-authorized-original-session-follow-up--completed)。
 
+前端1.4.0已完成本地发布前复核及打包，尚未上传。补足快速追问等待、倒计时延长、响应校验与SSE超时余量；162项Python及8项Node检查通过，浏览器使用固定样例验证，不消耗模型额度。线上首页仍返回1.3.1，见[安装包与预检记录](docs/public/WIDGET_PREFLIGHT.md)。
+
 ## 第一版范围
 
 - 需求式选茶

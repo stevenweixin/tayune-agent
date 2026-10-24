@@ -59,9 +59,9 @@ class FakeSessions:
 
 
 class ChatTimeoutTests(unittest.IsolatedAsyncioTestCase):
-    async def test_backend_budget_is_shorter_than_widget_wait(self):
+    async def test_backend_budget_leaves_room_for_widget_stream_delivery(self):
         self.assertEqual(CHAT_TIMEOUT_SECONDS, 85)
-        self.assertLess(CHAT_TIMEOUT_SECONDS, 95)
+        self.assertLess(CHAT_TIMEOUT_SECONDS + 12000 / 12 * 0.02 + 5, 115)
 
     async def test_timeout_returns_fallback_and_releases_service_lock(self):
         service = TeaService(SimpleNamespace(sessions=FakeSessions()))

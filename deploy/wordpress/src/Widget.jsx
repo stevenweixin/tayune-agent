@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, ArrowUpRight, ArrowCounterClockwise, X, Pause, Play, CaretDown } from '@phosphor-icons/react';
 import { Orb } from './Orb';
-import { appendDelta, readChatStream, safeParts } from './chat_protocol';
+import { appendDelta, readChatStream, safeParts, CHAT_TIMEOUT_MS } from './chat_protocol';
 
 const starters = ['Help me find a tea', 'How should I brew oolong in a mug?', 'Shipping & returns'];
 
@@ -23,6 +23,7 @@ export function Widget({ config }) {
   const logRef = useRef(null);
   const messageIdRef = useRef(0);
   const retryRef = useRef(null);
+  const cooldownUntilRef = useRef(0);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
   useEffect(() => {
@@ -33,13 +34,21 @@ export function Widget({ config }) {
   }, [messages, thinking, notice, open]);
   useEffect(() => {
     if (!cooldown) return;
-    const timer = setTimeout(() => setCooldown(value => Math.max(0, value - 1)), 1000);
-    return () => clearTimeout(timer);
+    // 等待被延长时，数字可能暂时不变；interval仍会继续检查，不能因此卡住按钮。
+    const timer = setInterval(() => setCooldown(Math.max(0,
+      Math.ceil((cooldownUntilRef.current - Date.now()) / 1000))), 1000);
+    return () => clearInterval(timer);
   }, [cooldown]);
 
   function closePanel() {
     setOpen(false);
     launcherRef.current?.focus();
+  }
+
+  function waitBeforeNext(seconds) {
+    // 时间戳避免后台标签页的计时器变慢后，多等一整段倒计时；也不缩短已有等待。
+    cooldownUntilRef.current = Math.max(cooldownUntilRef.current, Date.now() + seconds * 1000);
+    setCooldown(Math.max(0, Math.ceil((cooldownUntilRef.current - Date.now()) / 1000)));
   }
 
   function resetConversation() {
@@ -55,12 +64,14 @@ export function Widget({ config }) {
   async function post(path, body, onEvent) {
     const controller = new AbortController();
     controllerRef.current = controller;
-    const timer = setTimeout(() => controller.abort(), path === '/api/session' ? 10000 : 95000);
+    const timer = setTimeout(() => controller.abort(), path === '/api/session' ? 10000 : CHAT_TIMEOUT_MS);
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (path === '/api/chat') {
         headers.Authorization = 'Bearer ' + tokenRef.current;
         headers.Accept = 'text/event-stream';
+        // 后端限制同会话两次开始至少相隔8秒；前端留1秒余量，不改变服务端规则。
+        waitBeforeNext(9);
       }
       const response = await fetch(config.apiBase + path, {
         method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal,
@@ -72,7 +83,7 @@ export function Widget({ config }) {
       }
       if (response.status === 429) {
         const seconds = Number(response.headers.get('Retry-After'));
-        setCooldown(Number.isFinite(seconds) && seconds > 0 ? Math.min(Math.ceil(seconds), 600) : 10);
+        waitBeforeNext(Number.isFinite(seconds) && seconds > 0 ? Math.min(Math.ceil(seconds), 600) : 10);
         throw new Error('The assistant is busy or its request limit has been reached. Please wait and try later, or contact the shop.');
       }
       if (response.status === 409) {
@@ -93,7 +104,7 @@ export function Widget({ config }) {
 
   async function send(question) {
     const clean = question.trim();
-    if (!enabled || !clean || clean.length > 500 || busyRef.current || cooldown) return;
+    if (!enabled || !clean || clean.length > 500 || busyRef.current || cooldown || Date.now() < cooldownUntilRef.current) return;
     busyRef.current = true;
     setThinking(true);
     setNotice('');
@@ -101,6 +112,7 @@ export function Widget({ config }) {
     setMessages(previous => [...previous, { role: 'user', text: clean }]);
     const answerId = ++messageIdRef.current;
     let currentParts = [];
+    let receivedStream = false;
     try {
       // 只有用户主动发送才申请会话并调用Agent；打开面板、动画和打字不调用模型。
       if (!tokenRef.current) {
@@ -114,6 +126,7 @@ export function Widget({ config }) {
       }
       const result = await post('/api/chat', { message: clean, request_id: retryRef.current.id }, ({ event, data }) => {
         if (event === 'meta') {
+          receivedStream = true;
           setThinking(false);
           setStreaming(true);
           setMessages(previous => [...previous, { id: answerId, role: 'assistant', parts: [] }]);
@@ -125,9 +138,13 @@ export function Widget({ config }) {
         }
       });
       // 兼容仍返回JSON的旧后端；新版本通过delta持续更新，不在done时整段替换。
-      if (typeof result.answer === 'string') {
-        if (!result.answer.trim()) throw new Error('No answer was received. Please try again later.');
+      if (!result || typeof result !== 'object' || typeof result.degraded !== 'boolean') {
+        throw new Error('The answer format was invalid. Please try later or contact the shop.');
+      }
+      if (!receivedStream) {
+        if (typeof result.answer !== 'string' || !result.answer.trim()) throw new Error('No answer was received. Please try again later.');
         const parts = safeParts(result.answer_parts || [{ text: result.answer }]);
+        if (!parts.some(part => part.text.trim())) throw new Error('No answer was received. Please try again later.');
         setMessages(previous => [...previous, { id: answerId, role: 'assistant', parts }]);
       }
       if (result.degraded) setNotice('Some information could not be verified. Please check the linked pages or contact the shop.');
@@ -187,7 +204,7 @@ export function Widget({ config }) {
           }} />
           <button type="submit" aria-label="Send message" disabled={!enabled || !draft.trim() || thinking || streaming || cooldown > 0}><ArrowUp size={20} /></button>
         </div>
-        <div className="composer-note"><span>{cooldown ? `Please wait ${cooldown}s before retrying.` : 'No personal or payment details, please.'}</span><span>{draft.length}/500</span></div>
+        <div className="composer-note"><span>{cooldown ? `Please wait ${cooldown}s before sending another message.` : 'No personal or payment details, please.'}</span><span>{draft.length}/500</span></div>
         {enabled && <div className="privacy-note">AI provider: DeepSeek. Conversation memory expires after 24 hours of inactivity. <a href={config.privacyUrl} target="_blank" rel="noopener noreferrer">Privacy</a></div>}
       </form>
     </section>}

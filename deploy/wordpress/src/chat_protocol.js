@@ -1,4 +1,7 @@
 // 只消费已核验的答案事件；不解析模型HTML，不自动重试请求。
+// 后端85秒处理 + 最多约20秒分段交付（12000字符）+ 10秒网络余量。
+export const CHAT_TIMEOUT_MS = 115000;
+
 export function safeShopUrl(value) {
   try {
     const url = new URL(value);
