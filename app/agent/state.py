@@ -30,3 +30,4 @@ class TeaState(TypedDict, total=False):
     evidence_ids: list[str]
     session_revision: float
     memory_revision: int
+    grounding_mode: str

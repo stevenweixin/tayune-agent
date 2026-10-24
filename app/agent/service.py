@@ -186,10 +186,11 @@ class TeaService:
                 and execution.versions != self.runtime.snapshot_versions()):
             # 检索后若来源被撤回，不把已生成的旧证据答案继续交付。
             state = {**state, "answer": "The shop information changed during this request. Please ask again to refresh it.",
-                     "answer_parts": [], "sources": [], "evidence_ids": [], "degraded": True}
+                     "answer_parts": [], "sources": [], "evidence_ids": [], "grounding_mode": "fixed_reply", "degraded": True}
         answer = state.get("answer") or "I couldn't verify an answer. Please contact the shop."
         if execution:
             execution.event("answer", answer_hash=fingerprint(answer), evidence_ids=state.get("evidence_ids", []),
+                            grounding_mode=state.get("grounding_mode", "fixed_reply"),
                             degraded=state.get("degraded", False))
         history.append(AIMessage(content=answer))
         # 最多保留10轮、单消息有限长度；真实长期用户画像不属于首版范围。

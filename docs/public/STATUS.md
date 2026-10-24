@@ -1,6 +1,8 @@
 # Development Status
 
-Updated: 2026-10-23.
+Updated: 2026-10-24.
+
+The current source adds an extractive answer contract to address the October23 unsupported elaborations: the model selects current-turn evidence units, and the server renders their original text with trusted inline title links. 144 Python checks, 7 Node checks and 32 offline contract replays passed. This latest change has **not been restarted or live-retested**; the running backend described below predates it. It limits model-authored additions, not source truth or semantic relevance. See [contract and tradeoffs](CORE_RELIABILITY.md#extractive-answer-contract).
 
 The 1.4.0 reliability backend candidate is running after an operator restart; the1.4.0 widget is **not deployed**. It adds bounded task plans/checkpoints, session-scoped idempotency, model/tool gateways, explicit preferences and local management, minimized execution audit, 32 English contract replays and immutable knowledge releases. 125 Python checks, 7 Node checks and the widget build passed. Three separately authorized local real-model questions completed; manual review found unsupported answer elaborations, so full grounding acceptance has not passed. Nine free local management checks passed. No real Milvus release operation was performed. See [local acceptance and remaining issues](LOCAL_ACCEPTANCE.md) and [implementation scope](CORE_RELIABILITY.md).
 
@@ -19,6 +21,7 @@ The website widget 1.3.1 and Agent API are available as a small public pilot. Th
 - Product scope and USD budget filtering, with citation selection from registered source IDs.
 - One bounded, tool-free intent review for classifier-restricted requests; public requests can continue to the existing graph.
 - A final-answer citation gate with fixed source-free clarification replies and at most one correction cycle within the existing model/tool budgets.
+- The latest source replaces free-form cited final answers in the formal graph with validated evidence-unit selections; fixed replies and the existing correction budget remain. Deployment and real-model adherence are pending.
 - SSE delivery of the completed, validated answer and structured inline title links. This is not native model token streaming; initial generation wait is unchanged. Legacy JSON clients remain supported.
 
 ## Validation and Remaining Work

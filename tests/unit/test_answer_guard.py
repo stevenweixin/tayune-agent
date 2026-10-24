@@ -62,7 +62,7 @@ class FakeKnowledge:
     async def ainvoke(self, args):
         return {"ok": True, "passages": [{
             "title": "Brewing guide", "url": "https://tayunetea.com/brewing",
-            "content": "Use the mug method and remove the infuser.",
+            "text": "Use the mug method and remove the infuser.",
         }]}
 
 
@@ -92,7 +92,7 @@ class GraphGuardTests(unittest.IsolatedAsyncioTestCase):
         model = FakeModel([
             AIMessage(content="UNVERIFIED: use 5 g in 300 ml."),
             tool_request(),
-            AIMessage(content="Use the mug method and remove the infuser. [S1]"),
+            AIMessage(content='{"selections":[{"source_id":"S1","evidence_id":"E1"}]}'),
         ])
         state = await self.run_graph(model)
         self.assertFalse(state["degraded"])
@@ -121,10 +121,33 @@ class GraphGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state["answer"], FALLBACK)
 
     async def test_successful_cited_path_uses_no_repair(self):
-        model = FakeModel([tool_request(), AIMessage(content="Use the mug method. [S1]")])
+        model = FakeModel([tool_request(), AIMessage(content='{"selections":[{"source_id":"S1","evidence_id":"E1"}]}')])
         state = await self.run_graph(model)
         self.assertEqual(state.get("answer_repair_count", 0), 0)
         self.assertEqual(len(model.calls), 2)
+
+    async def test_known_source_with_invented_fact_requires_repair(self):
+        model = FakeModel([
+            tool_request(),
+            AIMessage(content="Use a heaped teaspoon. [S1]"),
+            AIMessage(content='{"selections":[{"source_id":"S1","evidence_id":"E1"}]}'),
+        ])
+        state = await self.run_graph(model)
+        self.assertFalse(state["degraded"])
+        self.assertEqual(state["model_count"], 3)
+        self.assertEqual(state["tool_count"], 1)
+        self.assertEqual(state["answer_repair_count"], 1)
+        self.assertIn("Use the mug method and remove the infuser.", state["answer"])
+        self.assertNotIn("teaspoon", state["answer"])
+        self.assertNotIn("teaspoon", model.calls[-1][-2].content)
+
+    async def test_known_source_does_not_bypass_guard_on_last_model_call(self):
+        model = FakeModel([tool_request(), AIMessage(content="Use a teaspoon. [S1]")])
+        state = await self.run_graph(model, model_count=2)
+        self.assertEqual(state["model_count"], 4)
+        self.assertTrue(state["degraded"])
+        self.assertEqual(state["answer"], FALLBACK)
+        self.assertEqual(state["sources"], [])
 
     async def test_clarification_does_not_require_a_tool(self):
         model = FakeModel([AIMessage(content="<reply:tea_preferences>")])

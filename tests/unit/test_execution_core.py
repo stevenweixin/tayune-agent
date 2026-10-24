@@ -286,7 +286,7 @@ class GatewayTests(unittest.IsolatedAsyncioTestCase):
                  "evidence_started_at": time.time(), "session_revision": 0, "memory_revision": 0}
         self.execution.checkpoint(state, "tools")
         self.runs.finish(self.run_id, "interrupted", None, self.execution.counters())
-        model = SimpleNamespace(ask=AsyncMock(return_value=AIMessage(content="[Fixture Oolong](source:S1) is listed.")))
+        model = SimpleNamespace(ask=AsyncMock(return_value=AIMessage(content='{"selections":[{"source_id":"S1","evidence_id":"E1"}]}')))
         with patch("app.agent.graph.setup_logging"):
             graph = build_graph(model, [tool])
         runtime = SimpleNamespace(sessions=self.sessions, runs=self.runs, versions={"code": "v1"}, graph=graph)

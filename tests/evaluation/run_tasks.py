@@ -39,7 +39,7 @@ class ReplayModel:
         if mode == "unsafe":
             return AIMessage(content="Use an unsupported 100 grams of tea.")
         if mode == "invented-source":
-            return AIMessage(content="An unsupported claim. [S99]")
+            return AIMessage(content='{"selections":[{"source_id":"S99","evidence_id":"E1"}]}')
         if mode == "loop":
             return request("search_products", {"search": "oolong"}, self.count)
         if self.count == 1:
@@ -65,7 +65,7 @@ class ReplayModel:
             return request("get_product", {"product_id": 7}, self.count)
         if mode in ("knowledge-failure", "product-failure", "guessed-id", "invalid-args", "unknown-tool"):
             return AIMessage(content="<reply:unavailable>")
-        return AIMessage(content="The verified fixture evidence is available here [Fixture source](source:S1).")
+        return AIMessage(content='{"selections":[{"source_id":"S1","evidence_id":"E1"}]}')
 
 
 class FixtureCatalog:
@@ -77,7 +77,7 @@ class FixtureCatalog:
             raise RuntimeError("fixture_unavailable")
         scope_name = {"tea": "Fixture Oolong", "teaware": "Fixture Tea Pet", "chenpi": "Fixture Chenpi", "all": "Fixture Oolong"}[product_scope]
         return {"products": [{"id": 7, "name": scope_name, "url": "https://tayunetea.com/product/fixture/",
-                              "price": "20.00", "currency": "USD", "in_stock": True}], "returned_count": 1}
+                              "price": "20.00", "currency": "USD", "is_in_stock": True}], "returned_count": 1}
 
     async def get_product(self, product_id):
         result = await self.search_products()

@@ -90,3 +90,25 @@ Live checks are opt-in and reject execution without both `--mode live --allow-pa
 ## Remaining Boundaries
 
 Public memory/progress/cancel controls, real-provider acceptance of routing/retry behavior, real Milvus release activation/rollback and live business-quality evaluation remain unverified or undeployed. No multi-Agent collaboration, employee identity, authenticated order access, cross-session long-term profile, arbitrary-code sandbox or write-operation approval system is claimed. Those require actual business scope and authorization, not merely more framework components.
+
+## Extractive Answer Contract
+
+Added October24 after the real acceptance found that valid citation IDs did not prevent unsupported teaspoon amounts, scaled recipes or unsolicited claims. Prompt instructions alone had not prevented those additions.
+
+The formal graph now supplies numbered evidence units from product details and retrieved text. Structured price, options and availability use deterministic labels; absent values remain unknown. Description/passage text is exposed as units rather than duplicated raw text. Each source has at most80 units, retaining each supplied nonempty line without accepting model-written substrings.
+
+The model selects one to six units using only this schema:
+
+```json
+{"selections":[{"source_id":"S1","evidence_id":"E1"}]}
+```
+
+`grounding.py` rejects unknown IDs, empty/oversized selections, prose, Markdown fences and extra fields such as text, quote, title or URL. The server renders the selected original units, deduplicates repeated selections and supplies the registered title/link. Internal guides get a plain title without an invented URL. An overlong rendered answer is rejected, not cut mid-condition. Fixed clarification/failure codes still work without evidence. The old `check_answer` renderer remains for compatibility tests and fixed replies, but the formal graph does not use it to admit free-form factual answers.
+
+An invalid final response gets at most one correction within the existing four-model/four-tool limits; exhausted budgets produce the existing fallback. No extra critic model or paid call is introduced by the checker. Agent tool selection and feedback remain intact; only final factual wording is constrained. JSON/SSE response shapes and the website plugin do not change. Audit events record `grounding_mode` without recording the answer text.
+
+Tradeoff: this is extractive evidence selection, not a semantic fact checker or natural paraphrasing. It can be less conversational, cannot freely synthesize comparisons or calculate conversions, and may select irrelevant or conflicting units. A supplied line may depend on preceding context, contain an outdated claim, or be a partial chunk; matching it does not certify full context or truth. Source quality, retrieval relevance, contextual completeness and model selection still require evaluation. Unit/answer limits can trigger fallback on large material.
+
+Validation:144 Python tests passed, including19 added grounding/graph regressions and the32 scripted business replays;7 Node stream tests passed. A separate replay invocation also passed32/32. These are contract checks using mocked dependencies, not model accuracy. They cover valid citations with invented prose, extra fields, unknown units, stable numbering, internal guides, conditions, bounds, repair and last-call fallback. Public fixtures were corrected to use the actual `text` and `is_in_stock` fields.
+
+The latest code is not yet restarted or live-retested. The October23 real acceptance record remains unchanged evidence of the previous behavior; further paid verification needs separate authorization. No production data, Milvus release, daily limit, environment, tunnel or WordPress deployment was changed.

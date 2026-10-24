@@ -11,7 +11,8 @@ from pathlib import Path
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END
 from app.agent.state import TeaState
-from app.agent.answer_guard import FALLBACK, REPAIR_PROMPT, check_answer
+from app.agent.answer_guard import FALLBACK, REPAIR_PROMPT
+from app.agent.grounding import check_grounded_answer, product_facts, record_units
 from app.core.logger import setup_logging
 from app.core.execution import current_execution
 from app.agent.plan import StepSpec, WorkflowPlan
@@ -61,7 +62,7 @@ def build_graph(model, tools):
                   "output_tokens": state.get("output_tokens", 0) + usage.get("output_tokens", 0)}
         if not response.tool_calls:
             try:
-                result = check_answer(response.content, state.get("sources", []))
+                result = check_grounded_answer(response.content, state.get("sources", []))
             except ValueError as error:
                 # error来自自己的固定错误码，不记录草稿、用户问题或工具正文。
                 logger.warning("stage=answer_guard status=rejected reason=%s", error)
@@ -131,13 +132,18 @@ def build_graph(model, tools):
                         if product["id"] not in known:
                             known.append(product["id"])
                         product["source_id"] = register_source(sources, product["name"], product["url"])
+                        product["evidence_units"] = record_units(sources, product["source_id"], product_facts(product))
                 elif name == "get_product":
                     product = result["data"]
                     product["source_id"] = register_source(sources, product["name"], product["url"])
+                    texts = product_facts(product)
+                    texts.append(product.pop("description", ""))
+                    product["evidence_units"] = record_units(sources, product["source_id"], texts)
                 elif name == "search_knowledge":
                     for passage in result["passages"]:
                         passage["source_id"] = register_source(
                             sources, passage["title"], passage["url"], passage.get("evidence_key"))
+                        passage["evidence_units"] = record_units(sources, passage["source_id"], [passage.pop("text", "")])
             # 必须对应原tool_call_id，每一个请求都回传结果，保持协议完整。
             messages.append(ToolMessage(content=json.dumps(result, ensure_ascii=False),
                                         tool_call_id=call["id"], name=name))

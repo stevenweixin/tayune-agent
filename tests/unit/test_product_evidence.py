@@ -161,7 +161,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
             tool = build_knowledge_tool(None, None, FakeCPU())
             model = ModelSequence([
                 AIMessage(content="", tool_calls=[{"name": "search_knowledge", "args": {"query": "brewing"}, "id": "one"}]),
-                AIMessage(content="Approved recipe. [S1]"),
+                AIMessage(content='{"selections":[{"source_id":"S1","evidence_id":"E1"}]}'),
             ])
             with patch("app.agent.graph.setup_logging"):
                 graph = build_graph(model, [tool])
@@ -178,7 +178,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
             tools = build_product_tools(WooCommerceClient(client))
             model = ModelSequence([
                 AIMessage(content="", tool_calls=[{"name": "get_product", "args": {"product_id": 614}, "id": "detail"}]),
-                AIMessage(content="For this tea in a mug: 3 g per 250 ml for 2-3 minutes. [S1]"),
+                AIMessage(content='{"selections":[{"source_id":"S1","evidence_id":"E5"}]}'),
             ])
             with patch("app.agent.graph.setup_logging"):
                 graph = build_graph(model, tools)
@@ -190,7 +190,10 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         for message in state["messages"]:
             if isinstance(message, ToolMessage):
                 tool_messages.append(json.loads(message.content))
-        self.assertIn("3 g per 250 ml", tool_messages[0]["data"]["description"])
+        units = tool_messages[0]["data"]["evidence_units"]
+        self.assertIn("3 g per 250 ml", units[-1]["text"])
+        self.assertIn(units[-1]["text"], state["answer"])
+        self.assertNotIn("description", tool_messages[0]["data"])
 
     async def test_product_id_still_must_come_from_a_known_result(self):
         def handler(request):
