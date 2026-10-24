@@ -19,7 +19,7 @@ class SearchProductsInput(BaseModel):
     # 防止模型传URL、管理参数等未知字段；严格整数避免把True当成页码1。
     model_config = ConfigDict(extra="forbid", strict=True)
     search: str = Field(default="", max_length=100,
-                        description="Short English product keywords, e.g. oolong. Empty lists a catalog page.")
+                        description="One short product/type keyword, e.g. jasmine or oolong. Not a taste sentence or combined alternatives. Empty lists a catalog page.")
     page: int = Field(default=1, ge=1, le=10, description="Catalog page, from 1 to 10.")
     per_page: int = Field(default=5, ge=1, le=10, description="Number of products, from 1 to 10.")
     max_price_usd: str | None = Field(default=None, min_length=1, max_length=16,
@@ -72,6 +72,8 @@ def build_product_tools(store: WooCommerceClient) -> list:
         """Search TAYUNE public products for current listed prices, availability and links.
         Returns one catalog page, not all matching products. English keywords are literal,
         not semantic taste matching. Empty results do not prove the whole shop has no match.
+        Search a single product/type keyword, not combined alternatives such as 'jasmine white tea'
+        or taste adjectives such as 'floral oolong'. If uncertain, list a page with search=''.
         Prices exclude final shipping/tax and may depend on options. Respect currency.
         On ok=false, do not invent products or treat the result as an empty catalog.
         Default scope is drinkable tea; use teaware only when the user asks for equipment or tea pets.

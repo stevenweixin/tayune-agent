@@ -4,6 +4,7 @@ from copy import deepcopy
 from time import monotonic, perf_counter
 
 import httpx
+from langchain_core.messages import SystemMessage
 
 from app.core.execution import current_execution, fingerprint
 
@@ -52,11 +53,26 @@ class ModelGateway:
                 model, name = self.fallback
             if tools is not None:
                 model = model.bind_tools(tools)
-            if options:
-                model = model.bind(**options)
+            call_messages = messages
+            call_options = dict(options or {})
+            # 按物理次数判断，包含复核/摘要/重试；最后一次不能再提出无法收尾的新工具请求。
+            final_only = (execution is not None and role == "main" and tools is not None
+                          and (execution.model_calls >= 4 or execution.tool_attempts >= 4))
+            if final_only:
+                call_options["tool_choice"] = "none"
+                call_messages = list(messages) + [SystemMessage(content=(
+                    "This is the final answer opportunity within this request's budget. "
+                    "No more tool calls are available. Select relevant current-turn evidence units "
+                    "using the required JSON contract, or use an allowed fixed reply code if "
+                    "evidence is insufficient. Do not invent missing details."))]
+                from app.integrations.deepseek_tools import check_messages
+                check_messages(call_messages)
+                execution.event("model_finalization", reason="model_budget" if execution.model_calls >= 4 else "tool_budget")
+            if call_options:
+                model = model.bind(**call_options)
             started = perf_counter()
             try:
-                response = await asyncio.wait_for(model.ainvoke(messages), timeout=25)
+                response = await asyncio.wait_for(model.ainvoke(call_messages), timeout=25)
             except asyncio.CancelledError:
                 if execution:
                     execution.usage_complete = False
@@ -89,6 +105,10 @@ class ModelGateway:
                                 prompt_hash=fingerprint(messages[0].content if messages else ""),
                                 input_tokens=usage.get("input_tokens", 0), output_tokens=usage.get("output_tokens", 0),
                                 estimated_usd=estimate, elapsed=round(perf_counter() - started, 3))
+            if final_only and response.tool_calls:
+                # 供应商若忽略none，也不能执行这批请求或放宽总预算。
+                execution.event("model_finalization_rejected", reason="unexpected_tool_calls")
+                raise ModelUnavailable("model_ignored_finalization")
             return response
 
     async def summarize(self, messages):

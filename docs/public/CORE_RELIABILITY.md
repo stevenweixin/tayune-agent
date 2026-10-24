@@ -112,3 +112,13 @@ Tradeoff: this is extractive evidence selection, not a semantic fact checker or 
 Validation:144 Python tests passed, including19 added grounding/graph regressions and the32 scripted business replays;7 Node stream tests passed. A separate replay invocation also passed32/32. These are contract checks using mocked dependencies, not model accuracy. They cover valid citations with invented prose, extra fields, unknown units, stable numbering, internal guides, conditions, bounds, repair and last-call fallback. Public fixtures were corrected to use the actual `text` and `is_in_stock` fields.
 
 The latest code is not yet restarted or live-retested. The October23 real acceptance record remains unchanged evidence of the previous behavior; further paid verification needs separate authorization. No production data, Milvus release, daily limit, environment, tunnel or WordPress deployment was changed.
+
+## Final-Answer Reservation
+
+An October24 restart/retest reached the new source but failed before producing a final evidence selection: three empty keyword searches and one matching search used four reads; review plus three main calls consumed the physical model budget, with a product-detail request still pending. Only one of the authorized two questions was sent; the dependent follow-up was stopped. See [retest evidence](LOCAL_ACCEPTANCE.md#october24-retest--budget-exhaustion).
+
+The subsequent gateway patch checks the shared physical counters on each attempt, including retries. For a main call with tools, the fourth physical model attempt or exhaustion of four tool attempts forces `tool_choice=none` and adds a finalization instruction. The model must select available relevant evidence or a fixed reply. If a provider still returns tool calls, they are rejected, not executed. Other roles and early calls remain unchanged; total budgets are not increased. `none` is a documented [DeepSeek Chat Completions option](https://api-docs.deepseek.com/api/create-chat-completion/).
+
+Product-tool descriptions now favor one short literal type/name keyword or an empty-search catalog page, rather than combined alternatives/taste adjectives. That is guidance, not semantic search or enforced semantic correctness. Finalization can still safely degrade when evidence is missing; it does not manufacture the detail that an exhausted tool budget could not retrieve.
+
+152 Python tests, including eight new gateway/SDK/graph cases, and seven Node tests pass. The SDK check uses MockTransport, not a real paid provider. The32 offline business replays still pass. The budget patch is not yet restarted or live-tested; the preceding real attempt does not establish extractive format adherence or completed shopping/brewing behavior.

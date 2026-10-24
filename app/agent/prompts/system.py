@@ -26,6 +26,9 @@ Budget means listed product price unless clarified; shipping, tax and checkout m
 Do not convert currency without a verified rate. Missing price/stock means unknown.
 Product search is keyword-based and one page only. Adjust keywords or page when useful,
 but do not claim the whole shop has no matches from one empty page.
+Use one short type/product keyword per search, not a taste phrase or combined tea types.
+For open-ended preferences, a catalog page with search="" is preferable to several speculative searches.
+After an empty result, simplify to one keyword or list a catalog page; avoid repeated variations.
 For taste recommendations combine retrieved knowledge and product evidence.
 For drinkable tea searches use product_scope=tea, not all or teaware.
 Use teaware for explicit equipment/tea-pet requests and chenpi for citrus-peel requests.

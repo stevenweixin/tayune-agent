@@ -67,3 +67,40 @@ Private generated evidence is retained locally under `reports/` and excluded fro
 Git. Next priorities are evidence-bound answer generation and tighter lookup/call
 selection, followed by separately authorized real retests. Actual Milvus release
 activation/rollback and WordPress1.4.0 deployment remain outside this run.
+
+## October24 Retest — Budget Exhaustion
+
+The operator restarted after `e0e3866` and authorized at most two real questions in
+one session. Readiness returned200, and the running code hash matched the committed
+app sources. Only the first question was sent: “Suggest one light, floral tea under
+$30 USD for me to consider.” It returnedHTTP200 in5.508s, but `degraded=true` and no
+product answer. The dependent mug follow-up was not sent, and no chat was retried.
+
+Audit: the classifier again returned restricted0.901, recovered by PUBLIC review.
+The main model searched “floral oolong” and “jasmine white tea”, both empty, followed
+by “oolong” (empty) and “jasmine” (one matching USD19.90 product, ID635). It then
+requested detail after all four tools were used. Review plus three main calls had
+also used all four physical model attempts. No final-selection response was produced;
+there was no evidence-selection format rejection. This is not a daily-rate-limit,
+API-key or Milvus-connectivity failure.
+
+Known usage:8584 input and377 output tokens, four model calls and four executed tool
+reads. The rejected fifth tool request was not executed. Daily count increased0to1,
+and history contains one human/assistant pair. Only this test task's private evidence
+was inspected. Its generated report remains ignored under reports/; no session
+credential is persisted there. No plugin, Milvus or quota setting was changed.
+
+Subsequent source fix: the model gateway uses the shared physical counters, including
+review/summary/retries, to force `tool_choice=none` for the last main-model call or
+when tool attempts are exhausted. It asks for current evidence selections or a fixed
+reply, not more tool requests. Retries recompute the condition; an ignored none is
+rejected without executing tools. Product prompts favor a short literal keyword or
+a catalog page instead of speculative combined taste terms. This prompt change is
+not a semantic search implementation or a guaranteed retrieval improvement.
+
+152 Python checks and7 Node checks passed;32 offline contract replays remain passing.
+Eight new tests cover finalization, unchanged early calls, tool exhaustion, retry,
+option precedence, ignored none, actual SDK request construction with MockTransport,
+and a graph with review plus four reads. No further real-model request was made.
+The budget fix requires a new restart and authorized retest. Neither the shopping
+task nor the extractive format is marked live-accepted by this failed attempt.
