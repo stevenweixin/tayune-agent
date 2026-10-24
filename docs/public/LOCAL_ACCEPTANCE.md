@@ -142,3 +142,40 @@ Conclusion: this real shopping example exercised and passed the extractive forma
 evidence-to-output rendering and inline-link checks. It does not establish general
 semantic accuracy, the finalization branch, or the unprocessed mug follow-up.
 The full two-turn path remains incomplete; any additional POST needs authorization.
+
+## October24 Authorized Original-Session Follow-Up — Completed
+
+The operator separately authorized exactly one additional mug follow-up, with no
+repeat shopping question and no automatic retry. The original disposable session
+was resolved from its known acceptance task; its history was checked before sending.
+No replacement session was created, and no credential was saved in the report.
+
+“How should I brew that tea in a mug?” completed in4.777s, HTTP200, `completed`,
+`degraded=false`. It resolved the jasmine tea from the earlier conversation and
+performed fresh search_products/get_product reads for product635. The classifier
+returned in_scope0.969; no intent-review call was needed. The running code hash
+matched the previous `b0b1fc5` acceptance.
+
+The model selected S1/E13 and S1/E14. Each selected unit matched the original product
+description after whitespace normalization, and re-rendering the selection matched
+the API answer and answer_parts exactly. The supplied How to Brew text specifies
+2–3g per200ml, about80–85°C, and2–3minutes; the second paragraph covers re-steeping.
+This is the product's general brewing guidance, not a separately labeled mug recipe
+or a custom cup-size conversion. No teaspoon or350–400ml example was added. The
+product title carried its registered inline URL; no unrelated source was displayed.
+
+The follow-up used three physical model calls and two tool reads, with9154 input
+and118 output tokens. Daily count increased2to3. History now contains the original
+shopping pair and the completed follow-up pair, four human/assistant messages.
+There were no additional chat POSTs in this authorization. The two successful turns
+together used six model calls, four reads,14888 input and297 output tokens; the
+earlier rejected429 request used none. No provider invoice amount was inferred.
+
+Conclusion: this single local JSON shopping-to-brewing example completed with
+current evidence selections, matching product fields, original brewing text and
+inline title links. It does not establish general accuracy or live forced-finalization
+behavior; neither turn needed a fourth model call. This follow-up used WooCommerce,
+not search_knowledge, so it is not a new Milvus retrieval acceptance test. Website
+SSE/mobile, provider fault handling, summary triggering and knowledge release
+activation/rollback remain outside this acceptance. No runtime code, quota, plugin,
+Milvus, environment or tunnel setting was changed.
