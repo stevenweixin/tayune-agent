@@ -1,8 +1,20 @@
 # Public Pilot Release
 
-Updated: 2026-10-22. Status: small public pilot, widget 1.3.1 deployed.
+Updated: 2026-10-24. Status: small public pilot, widget1.4.0 deployed; partial acceptance.
 
-The deployed site uses widget 1.3.1 with chat enabled. The existing tunnel forwards the exact `/api/session` and `/api/chat` paths in addition to health checks. Activation was explicitly approved; no new paid service was added.
+The deployed site uses widget1.4.0 with chat enabled. The existing tunnel forwards the exact `/api/session` and `/api/chat` paths in addition to health checks. Activation was explicitly approved; no new paid service was added.
+
+## 1.4.0 Deployment
+
+The operator authorized the plugin update and at most three website questions.
+WordPress reported a successful1.3.1-to-1.4.0 upgrade and the anonymous homepage
+loaded1.4.0. Product and policy answers completed with inline title links; a
+same-session brewing follow-up showed a network notice without a registered task.
+There was no retry and the exact cause remains unknown. Ordinary Search and393px
+layout were checked. No backend, quota, tunnel or Milvus change was made.
+See [complete results, accounting and limits](WIDGET_140_ACCEPTANCE.md).
+The earlier release records below remain historical evidence, not substitutes
+for the failed current follow-up or physical iPhone/SSE-cadence acceptance.
 
 ## 1.3.1 Mobile Orb Compatibility
 

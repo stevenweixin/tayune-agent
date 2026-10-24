@@ -1,6 +1,8 @@
 # WordPress 1.4.0 Preflight
 
 Date: 2026-10-24. Status: **packaged locally, not uploaded**.
+This is the preflight-time record. The subsequent authorized upload and partial
+website acceptance are recorded in [deployment results](WIDGET_140_ACCEPTANCE.md).
 The public homepage still returned widget1.3.1 during the read-only asset check.
 No WordPress, tunnel, quota, backend-runtime or Milvus operation was performed.
 No real session/chat request or paid model call was made in this preflight.
