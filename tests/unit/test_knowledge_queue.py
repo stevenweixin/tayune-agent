@@ -110,6 +110,23 @@ class KnowledgeQueueTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(result["ok"])
             self.assertEqual(pipeline.call_args.args[-1], "en")
 
+    async def test_runtime_can_set_larger_but_bounded_knowledge_queue(self):
+        with patch("app.agent.knowledge_tool.retrieve", side_effect=self.blocked_retrieve):
+            tool = build_knowledge_tool(None, None, self.cpu, max_pending=4)
+            first = asyncio.create_task(tool.ainvoke({"query": "first"}))
+            await wait_started(self.entered)
+            waiting = [asyncio.create_task(tool.ainvoke({"query": f"waiting-{index}"})) for index in range(3)]
+            await asyncio.sleep(.01)
+            rejected = await tool.ainvoke({"query": "fifth"})
+            self.assertEqual(rejected["error"], "knowledge_unavailable")
+            self.release.set()
+            self.assertTrue(all(item["ok"] for item in await asyncio.gather(first, *waiting)))
+            self.assertEqual(len(self.executed), 4)
+
+    async def test_invalid_knowledge_queue_limit_fails_before_serving(self):
+        with self.assertRaises(ValueError):
+            build_knowledge_tool(None, None, self.cpu, max_pending=0)
+
 
 class LanguageAndReplyTests(unittest.TestCase):
     def test_dense_and_sparse_have_identical_language_filter(self):

@@ -19,7 +19,8 @@ from app.agent.product_tool import build_product_tools
 from app.agent.knowledge_tool import build_knowledge_tool
 from app.agent.graph import build_graph
 from app.agent.intent_review import IntentReviewer
-from app.core.cpu_worker import CPUWorker
+from app.core.cpu_worker import CPUQueue
+from app.core.concurrency import read_chat_capacity
 from app.database.session import SessionStore
 from app.database.runs import RunStore
 from app.integrations.model_gateway import ModelGateway
@@ -36,7 +37,7 @@ class Runtime:
         self.sync_http = None
         self.milvus = None
         self.sessions = None
-        self.cpu = CPUWorker()
+        self.cpu = CPUQueue()
         self.classifier = None
         self.graph = None
         self.intent_reviewer = None
@@ -47,6 +48,7 @@ class Runtime:
     async def start(self):
         # 只在服务入口加载，环境变量优先，兼容已完成Milvus配置读取函数。
         load_dotenv(ROOT / ".env", override=False) # override=False:如果环境变量已存在,不覆盖。部署时服务器设置的环境变量优先于本地文件。
+        self.max_concurrent_chats = read_chat_capacity()
         config = read_config()
         self.http = httpx.AsyncClient(trust_env=False)
         self.sync_http = httpx.Client(trust_env=False)
@@ -57,7 +59,8 @@ class Runtime:
         self.cleanup_task = asyncio.create_task(self.cleanup_loop())
         self.classifier, retriever, reranker = await self.cpu.run(self.load_models)
         tools = build_product_tools(WooCommerceClient(self.http))
-        tools.append(build_knowledge_tool(retriever,reranker,self.cpu))
+        tools.append(build_knowledge_tool(retriever, reranker, self.cpu,
+                                          max_pending=2 * self.max_concurrent_chats))
         from langchain_openai import ChatOpenAI
         # SDK重试参数必须在创建时设置；复制已创建对象不一定改变内部HTTP客户端。
         llm = ChatOpenAI(model=config["DEEPSEEK_MODEL"], api_key=config["DEEPSEEK_API_KEY"],

@@ -1,5 +1,5 @@
 """会话历史 -> 分类提示/摘要 -> Agent图 -> 精简历史保存。
-一台电脑低频测试，单请求执行锁避免多个大模型推理争用，不无限排队。
+不同会话有限并发，同会话串行；CPU资源由独立的有界队列保护。
 业务流程的总指挥:一个顾客的问题进来,经过哪些步骤,最后返回什么。
 """
 import asyncio
@@ -12,25 +12,31 @@ from langchain_core.messages import HumanMessage,AIMessage,SystemMessage
 from app.agent.prompts.system import SYSTEM_PROMPT
 from app.core.memory_summary import compress_history
 from app.core.execution import CURRENT_RUN, Execution, decode_state, fingerprint
+from app.core.concurrency import RequestCoordinator
 
 logger = logging.getLogger("tayune_agent.service")
 
 RESTRICTED_REPLY = "I can help with public tea and shop information, but cannot access private data or perform account operations."
 UNCLEAR_REPLY = "Please clarify your question about public products, brewing, or shop policies. I cannot access private records or carry out account actions."
 REVIEW_UNAVAILABLE = "I couldn't verify the request safely right now. Please try later or contact the shop."
-# 正式悬浮窗等待95秒；后端提前结束等待，留10秒传输降级结果。
+# 正式悬浮窗等待115秒；后端85秒期限为分段交付和网络传输留余量。
 # 取消等待不等于强制杀掉CPU线程，CPUWorker仍负责等待底层工作结束。
 CHAT_TIMEOUT_SECONDS = 85
 
 
 class TeaService:
-    def __init__(self, runtime, daily_limit =20):
+    def __init__(self, runtime, daily_limit=20, max_concurrent=4):
         self.runtime = runtime
         self.daily_limit = daily_limit
-        self.lock = asyncio.Lock()
+        self.requests = RequestCoordinator(max_concurrent)
         self.active = {}
 
     async def chat(self, token, question, request_key=None):
+        # 必须先占会话再读取历史，避免两个请求分别持有旧快照并互相覆盖。
+        with self.requests.session(token):
+            return await self._chat(token, question, request_key)
+
+    async def _chat(self, token, question, request_key):
         data = self.runtime.sessions.get(token)
         if data is None:
             raise LookupError("会话不存在或已过期")
@@ -46,11 +52,9 @@ class TeaService:
                         raise ValueError("stale_request_result")
                     return previous["result"]
                 raise RuntimeError("task_in_progress_or_interrupted")
-        if self.lock.locked():
-            raise RuntimeError("busy")
         if time.time() - data["last_request"] < 8:
             raise RuntimeError("rate_limit")
-        async with self.lock:
+        with self.requests.slot():
             execution = None
             marker = None
             if runs:
@@ -221,6 +225,11 @@ class TeaService:
                 "note": "An already running CPU operation may still finish."}
 
     async def resume(self, token, run_id):
+        # 恢复和普通聊天争用同一会话名额、同一全局容量，不另开绕行入口。
+        with self.requests.session(token):
+            return await self._resume(token, run_id)
+
+    async def _resume(self, token, run_id):
         data = self.runtime.sessions.get(token)
         if data is None:
             raise LookupError("session_expired")
@@ -232,8 +241,6 @@ class TeaService:
                     or saved["versions"] != current_versions):
                 raise ValueError("start_new_request_to_refresh_evidence")
             return saved["result"]
-        if self.lock.locked():
-            raise RuntimeError("busy")
         # 只恢复最近60秒、相同版本的节点边界。陈旧商品证据必须新请求重新核验。
         if (saved["status"] not in ("interrupted", "timed_out") or not saved["checkpoint"]
                 or time.time() - saved["checkpoint"].get("evidence_started_at", 0) > 60
@@ -247,7 +254,7 @@ class TeaService:
         for item in state["dialogue"]:
             kind = HumanMessage if item["role"] == "human" else AIMessage
             history.append(kind(content=item["text"]))
-        async with self.lock:
+        with self.requests.slot():
             runs.claim_resume(run_id)
             execution = Execution(run_id, runs, saved["versions"], **saved["counters"])
             marker = CURRENT_RUN.set(execution)
@@ -270,6 +277,14 @@ class TeaService:
                 else:
                     status = "timed_out" if isinstance(error, TimeoutError) else "failed"
                 runs.finish(run_id, status, None, execution.counters())
+                if status == "cancelled" and not asyncio.current_task().cancelling():
+                    # 用户取消子任务时正常交付取消结果；HTTP调用者自身取消仍向上传播。
+                    result = {"answer": "This request was cancelled. You can ask a new tea question.",
+                              "sources": [], "degraded": True, "task_id": run_id, "task_status": status,
+                              "usage": execution.usage(), "tool_count": execution.tool_attempts,
+                              "model_calls": execution.model_calls, "usage_complete": execution.usage_complete}
+                    runs.finish(run_id, status, result, execution.counters())
+                    return result
                 raise
             finally:
                 self.active.pop(run_id, None)

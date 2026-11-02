@@ -33,20 +33,8 @@ class CapacityGate:
 
 class CapacityService(ObservedService):
     def __init__(self, runtime, capacity):
-        super().__init__(runtime, daily_limit=1000)
-        self.lock = CapacityGate(capacity)
-        self.owners = set()
-
-    async def chat(self, token, *args, **kwargs):
-        # 同一会话仍只允许一条在途问答，防止历史丢失；原幂等/8秒/预算逻辑照常运行。
-        if token in self.owners:
-            self.outcomes["session_busy"] += 1
-            raise RuntimeError("session_busy")
-        self.owners.add(token)
-        try:
-            return await super().chat(token, *args, **kwargs)
-        finally:
-            self.owners.discard(token)
+        # 正式Service已具备会话/容量保护，不再注入旧的实验锁适配层。
+        super().__init__(runtime, daily_limit=1000, max_concurrent=capacity)
 
 
 class QueuedCPU:

@@ -21,7 +21,11 @@ class KnowledgeInput(BaseModel):
         default=None, description="Optional knowledge category.")
 
 
-def build_knowledge_tool(retriever, reranker, cpu):
+def build_knowledge_tool(retriever, reranker, cpu, *, max_pending=None):
+    # 正式Runtime按聊天容量设置；旧调用不传时保留原来一个执行、一个等待的上限。
+    limit = MAX_PENDING_KNOWLEDGE if max_pending is None else max_pending
+    if type(limit) is not int or limit < 1:
+        raise ValueError("Invalid knowledge queue limit")
     # 同一工具实例共享这把锁：网络读取仍可并行，CPU检索/精排有界串行。
     knowledge_lock = asyncio.Lock()
     pending = 0
@@ -38,7 +42,7 @@ def build_knowledge_tool(retriever, reranker, cpu):
         nonlocal pending
         started = perf_counter()
         logger.info("stage=knowledge status=start source_type=%s", source_type or "all")
-        if pending >= MAX_PENDING_KNOWLEDGE:
+        if pending >= limit:
             logger.warning("stage=knowledge status=queue_full")
             return {"ok": False, "error": "knowledge_unavailable"}
         pending += 1

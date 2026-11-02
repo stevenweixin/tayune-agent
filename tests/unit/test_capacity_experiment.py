@@ -1,4 +1,4 @@
-"""只验证容量实验注入层，正式Service和CPUWorker默认行为不变。"""
+"""验证容量实验控制层；Service并发控制的正式回归另见test_service_concurrency。"""
 import asyncio
 import tempfile
 import threading
@@ -55,7 +55,7 @@ class AdmissionTests(unittest.IsolatedAsyncioTestCase):
                     await service.chat(a, "second", "request-second-001")
                 second = asyncio.create_task(service.chat(b, "other", "request-other-001"))
                 await asyncio.sleep(.01)
-                self.assertEqual(service.lock.peak, 2)
+                self.assertEqual(service.requests.peak, 2)
                 release.set()
                 results = await asyncio.gather(first, second)
                 self.assertNotEqual(results[0]["task_id"], results[1]["task_id"])

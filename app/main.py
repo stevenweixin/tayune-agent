@@ -26,7 +26,8 @@ def create_app(runtime_factory = Runtime):
         try:
             await runtime.start()
             app.state.runtime = runtime
-            app.state.service = TeaService(runtime,int(os.getenv("TAYUNE_DAILY_REQUEST_LIMIT", "20")))
+            app.state.service = TeaService(runtime, int(os.getenv("TAYUNE_DAILY_REQUEST_LIMIT", "20")),
+                                           max_concurrent=getattr(runtime, "max_concurrent_chats", 4))
             yield
         finally:
             await runtime.close()
@@ -164,21 +165,25 @@ def create_app(runtime_factory = Runtime):
     @api.post("/api/local/memory")
     async def correct_memory(body: PreferencePatch, request: Request, authorization: str = Header(default="")):
         token = local_session(request, authorization)
-        if request.app.state.service.lock.locked():
-            raise HTTPException(409, "Finish or cancel the current request first")
         store = request.app.state.runtime.sessions
-        data = store.get(token)
-        data["preferences"] = update_preferences(data.get("preferences", {}), body)
-        data["memory_revision"] = data.get("memory_revision", 0) + 1
-        store.save(token, data)
+        try:
+            with request.app.state.service.requests.session(token):
+                data = store.get(token)
+                data["preferences"] = update_preferences(data.get("preferences", {}), body)
+                data["memory_revision"] = data.get("memory_revision", 0) + 1
+                store.save(token, data)
+        except RuntimeError:
+            raise HTTPException(409, "Finish or cancel this session's current request first") from None
         return {"preferences": data["preferences"]}
 
     @api.delete("/api/local/memory")
     async def delete_memory(request: Request, authorization: str = Header(default="")):
         token = local_session(request, authorization)
-        if request.app.state.service.lock.locked():
-            raise HTTPException(409, "Finish or cancel the current request first")
-        request.app.state.runtime.sessions.delete(token)
+        try:
+            with request.app.state.service.requests.session(token):
+                request.app.state.runtime.sessions.delete(token)
+        except RuntimeError:
+            raise HTTPException(409, "Finish or cancel this session's current request first") from None
         # 删除不会退还每日次数，也不会删除其他会话。旧token随即失效。
         return {"status": "deleted"}
 

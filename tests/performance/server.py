@@ -113,8 +113,9 @@ class OfflineRuntime:
 
 
 class ObservedService(TeaService):
-    def __init__(self, runtime, daily_limit):
-        super().__init__(runtime, daily_limit)
+    def __init__(self, runtime, daily_limit, max_concurrent=1):
+        # 旧模拟基线显式保留单准入；正式入口不使用这个测试类。
+        super().__init__(runtime, daily_limit, max_concurrent=max_concurrent)
         self.outcomes = Counter()
 
     async def chat(self, *args, **kwargs):

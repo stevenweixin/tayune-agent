@@ -63,7 +63,7 @@ class ChatTimeoutTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(CHAT_TIMEOUT_SECONDS, 85)
         self.assertLess(CHAT_TIMEOUT_SECONDS + 12000 / 12 * 0.02 + 5, 115)
 
-    async def test_timeout_returns_fallback_and_releases_service_lock(self):
+    async def test_timeout_returns_fallback_and_releases_capacity_and_session(self):
         service = TeaService(SimpleNamespace(sessions=FakeSessions()))
         cancelled = []
 
@@ -79,7 +79,8 @@ class ChatTimeoutTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["degraded"])
         self.assertEqual(result["trace"], ["service:fallback"])
         self.assertEqual(cancelled, [True])
-        self.assertFalse(service.lock.locked())
+        self.assertEqual(service.requests.active, 0)
+        self.assertEqual(service.requests.owners, set())
 
 
 if __name__ == "__main__":

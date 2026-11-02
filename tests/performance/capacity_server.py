@@ -12,6 +12,7 @@ from app.agent.graph import build_graph
 from app.agent.knowledge_tool import build_knowledge_tool
 from app.agent.product_tool import build_product_tools
 from app.core.logger import setup_logging
+from app.core.cpu_worker import CPUWorker
 from app.integrations.deepseek_tools import ToolModel
 from app.integrations.model_gateway import ModelGateway
 from app.main import ROOT, create_app
@@ -47,6 +48,8 @@ class CapacityRealRuntime(EvaluationRuntime):
         self.output = output
         if queued:
             self.cpu = QueuedCPU()
+        else:
+            self.cpu = CPUWorker()
 
 
 class FixtureClassifier:
@@ -112,6 +115,7 @@ def capacity_app(args):
             os.environ[key] = "deepseek-flash"
         os.environ["TAYUNE_FALLBACK_MODEL"] = ""
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        os.environ["TAYUNE_MAX_CONCURRENT_CHATS"] = str(args.capacity)
         budget = SharedBudget(output / "model_attempts.jsonl", max_attempts=args.attempts, max_usd=args.usd)
         runtime = CapacityRealRuntime(output, budget, queued)
     else:
@@ -160,7 +164,7 @@ def capacity_app(args):
         budget_count = runtime.sessions.db.execute("SELECT COALESCE(SUM(count),0) FROM budget").fetchone()[0]
         runs = runtime.sessions.db.execute("SELECT COUNT(*) FROM task_runs").fetchone()[0]
         info = {"dependencies": args.dependencies, "profile": args.profile, "capacity": args.capacity,
-                "active": service.lock.active, "peak_active": service.lock.peak,
+                "active": service.requests.active, "peak_active": service.requests.peak,
                 "knowledge_max_pending": knowledge.MAX_PENDING_KNOWLEDGE, "outcomes": dict(service.outcomes),
                 "budget_count": budget_count, "task_rows": runs, "event_loop_lag": distribution(lag),
                 "cpu_max_pending": 16 if queued else 1, "versions": runtime.versions}

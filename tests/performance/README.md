@@ -4,6 +4,27 @@ These runners never target the public website or production port 8011. They use
 loopback 8012 and separate SQLite files under `reports/`. They do not change
 production `.env`, website switches, quotas, or Milvus records.
 
+## Formal Service Concurrency Verification (No Paid Model Calls)
+
+```sh
+python -m tests.performance.verify_production_concurrency --output reports/next_formal_concurrency
+python -m tests.performance.verify_production_concurrency \
+  --output reports/next_formal_real_rag --real-retrieval
+```
+
+Both commands exercise the production TeaService and CPUQueue through in-process
+ASGI HTTP. The second loads actual local models and reads TAYUNE Milvus, but ALL
+LLM roles/fallback and the catalog are replaced with fixtures before any chat.
+Neither is a paid-provider load test or a semantic answer-quality measurement.
+The 12 checks cover four active sessions, fifth/same-owner rejection, management
+owner isolation, history, quota, idempotency and resource release.
+Additional unit tests cover task recovery/cancellation and CPU timeout behavior.
+
+Historical capacity experiment numbers belong to commit `02a56d6`. Current
+experiment helpers reuse the formal Service coordinator; reproduce the original
+frozen implementation from that revision, not by assuming later main is unchanged.
+See [formal concurrency design](../../docs/public/CONCURRENCY_CONTROL.md).
+
 ## Bounded Concurrency Experiment
 
 ```sh
