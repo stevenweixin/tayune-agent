@@ -4,6 +4,36 @@ These runners never target the public website or production port 8011. They use
 loopback 8012 and separate SQLite files under `reports/`. They do not change
 production `.env`, website switches, quotas, or Milvus records.
 
+## Bounded Concurrency Experiment
+
+```sh
+python -m tests.performance.run_capacity \
+  --output reports/next_capacity_run --locust reports/loadgen/bin/locust
+# Add --paid only after new authorization for up to 120 physical attempts / estimated US$1.
+# Each run requires a NEW output directory; authorization is not renewed by changing that directory.
+python -m tests.performance.summarize_capacity --input reports/next_paid_capacity_run
+```
+
+The non-paid command runs five 20-user, nominal 30-second simulated-dependency stages.
+With `--paid`, it additionally runs the frozen real burst matrix sequentially on 8012.
+It carries the remaining physical-attempt and cost budget between processes, stops on
+unknown usage, and skips capacity 8 if earlier queued within-capacity bursts miss
+the reference functional-proxy / latency threshold. It never kills an existing server.
+
+Profiles compare single admission, wider admission with original fail-fast CPU,
+and wider admission with a bounded shared CPU queue. Same-session chat ownership
+is retained. Knowledge-tool pending capacity is also scaled in the experimental
+process. Management mutation routes are DISABLED: this is not a production-ready
+replacement for the service lock. No request is sent via the public Tunnel.
+
+Fresh anonymous sessions alternate two fixed simple questions. Successful response
+latency excludes 429 and degraded 200. The real test is a small burst experiment,
+not steady-state QPS, human answer correctness, or a hardware maximum.
+The summarizer consumes real results, so it requires a paid run output, not a
+simulated-only output. Raw rows stay private under `reports/`.
+
+See [Chinese capacity report](../../docs/public/CAPACITY_EXPERIMENT_20261102_ZH.md).
+
 ## Dependency-Free Baselines
 
 Run the existing tracked Python unit suite and `node --test tests/widget_stream.test.mjs`.

@@ -29,13 +29,13 @@ def distribution(values):
 
 
 @contextmanager
-def server(output, profile="diagnostic"):
+def server(output, profile="diagnostic", module="tests.performance.server", extra_args=None):
     with socket.socket() as probe:
         if probe.connect_ex(("127.0.0.1", 8012)) == 0:
             raise RuntimeError("8012 is occupied; refusing to stop an existing service")
     log = (output.parent / (output.name + "-console.log")).open("x", encoding="utf-8")
-    process = subprocess.Popen([sys.executable, "-m", "tests.performance.server", "--output", str(output),
-                                "--profile", profile], cwd=ROOT, stdout=log, stderr=log)
+    process = subprocess.Popen([sys.executable, "-m", module, "--output", str(output),
+                                "--profile", profile] + list(extra_args or []), cwd=ROOT, stdout=log, stderr=log)
     try:
         with httpx.Client(trust_env=False, timeout=2) as client:
             for _ in range(120):
