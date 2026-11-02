@@ -29,7 +29,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Runtime:
-    def __init__(self):
+    def __init__(self, session_path: Path | None = None):
+        # 评测进程显式传独立文件；正式入口不传，沿用原来的生产数据库。
+        self.session_path = session_path if session_path is not None else ROOT / "data/generated/tayune_sessions.sqlite3"
         self.http = None
         self.sync_http = None
         self.milvus = None
@@ -48,7 +50,7 @@ class Runtime:
         config = read_config()
         self.http = httpx.AsyncClient(trust_env=False)
         self.sync_http = httpx.Client(trust_env=False)
-        self.sessions = SessionStore(ROOT / "data/generated/tayune_sessions.sqlite3")
+        self.sessions = SessionStore(self.session_path)
         self.runs = RunStore(self.sessions)
         self.sessions.runs = self.runs
         self.sessions.cleanup()
