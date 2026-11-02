@@ -1,6 +1,7 @@
 """仅用于已授权评测的跨角色总预算；不改变生产网关。"""
 import json
 import time
+from app.core.execution import current_execution
 
 
 class EvaluationBudget:
@@ -25,6 +26,9 @@ class EvaluationBudget:
 
     def finish(self, number, role, started, response=None, error=None):
         row = {"attempt": number, "role": role, "elapsed_seconds": time.perf_counter() - started}
+        execution = current_execution()
+        if execution:
+            row["run_id"] = execution.run_id
         usage = response.usage_metadata if response is not None else None
         if not usage or type(usage.get("input_tokens")) is not int or type(usage.get("output_tokens")) is not int:
             self.stopped = "unknown_provider_usage"

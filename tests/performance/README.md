@@ -4,6 +4,33 @@ These runners never target the public website or production port 8011. They use
 loopback 8012 and separate SQLite files under `reports/`. They do not change
 production `.env`, website switches, quotas, or Milvus records.
 
+## Full Formal Agent Evaluation
+
+```sh
+# Read-only local retrieval comparison; no model-provider calls.
+python -m tests.performance.run_components --output reports/next_full/components --language en
+# Requires NEW authorization: 75 chat submissions, 300 physical attempts, estimated US$1 maximum.
+python -m tests.performance.run_full_agent --output reports/next_full/agent --paid
+# After reviewing ALL functional answers against frozen rubrics, create
+# reports/next_full/assistant_review.json (review_kind, cases: id/verdict/note).
+python -m tests.performance.summarize_full_agent --input reports/next_full
+```
+
+The paid runner uses the formal Service and CPUQueue, real local retrieval and public
+catalog API. It runs 3 SSE smoke requests, 60 fixed functional requests, then bursts
+of 4 and 8 different sessions against capacity 4. Model roles use deepseek-flash only
+in this process. Session cooldown and per-question budgets remain enabled. Only the
+isolated IP/daily limits are raised. It stops on unknown usage or aggregate budget;
+it never auto-retries a whole question to replace a bad result. Shared paid budgeting
+includes in-flight reservations and every model role. Startup refuses occupied 8012.
+
+The summarizer is offline: it checks per-case review coverage, joins physical usage
+to task IDs, verifies frozen source hashes, and emits analysis.json plus a private
+per-case Markdown table. Verdicts are meets_rubric / partial / not_completed /
+appropriate_clarification. Assistant review is not independent human gold accuracy.
+Three short conversations do not exercise summary compression or long-term memory.
+Raw results remain Git-ignored. See the [Chinese full report](../../docs/public/FULL_AGENT_EVALUATION_20261102_ZH.md).
+
 ## Formal Service Concurrency Verification (No Paid Model Calls)
 
 ```sh

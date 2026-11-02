@@ -16,7 +16,7 @@ from langchain_core.documents import Document
 
 from app.core.logger import setup_logging
 from app.core.runtime import ROOT, Runtime
-from app.rag.hybrid_retriever import HybridRetriever
+from app.rag.hybrid_retriever import HybridRetriever, LANGUAGE_VALUES
 from tests.performance.run_offline import distribution
 
 PROBES = [
@@ -60,6 +60,7 @@ def describe(documents):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--language", choices=["en", "zh"], help="Apply the SAME language scope to dense and hybrid")
     args = parser.parse_args()
     output = args.output.resolve()
     if not output.is_relative_to(ROOT / "reports"):
@@ -89,9 +90,13 @@ def main():
                     "collection": retriever.collection, "knowledge_version": retriever.knowledge_version,
                     "gold_sha256": hashlib.sha256(frozen.encode()).hexdigest(),
                     "human_gold_review": "pending", "independent_gold": False,
-                    "comparison": "same one-time query vectors, approved source set, top6 candidates; no source-type filter"}
+                    "comparison": "same one-time query vectors, approved source set, top6 candidates; no source-type filter",
+                    "language": args.language}
         (output / "manifest.json").write_text(json.dumps(manifest, indent=2))
         rows = []
+        expression = 'review_status == "approved"'
+        if args.language:
+            expression += ' and metadata["language"] in ' + json.dumps(LANGUAGE_VALUES[args.language], ensure_ascii=False)
         for index, label in enumerate(labels):
             query, title, anchor = label["query"], label["title"], label["anchor"]
             timings = {}
@@ -103,7 +108,7 @@ def main():
             timings["embedding_ms"] = (time.perf_counter() - started) * 1000
             started = time.perf_counter()
             dense_raw = runtime.milvus.search(collection_name=retriever.collection, data=[dense],
-                anns_field="dense_vector", filter='review_status == "approved"',
+                anns_field="dense_vector", filter=expression,
                 search_params={"metric_type": "COSINE", "params": {}}, limit=6,
                 output_fields=["text", "metadata"], timeout=30)
             dense_docs = [(Document(page_content=item["entity"]["text"], metadata=item["entity"]["metadata"]),
@@ -114,7 +119,7 @@ def main():
             frozen_retriever = HybridRetriever(runtime.milvus, FrozenQueryEmbedding(dense, sparse),
                 retriever.collection, retriever.knowledge_version, retriever.releases)
             started = time.perf_counter()
-            hybrid = frozen_retriever.search(query, top_k=6)
+            hybrid = frozen_retriever.search(query, top_k=6, language=args.language)
             timings["hybrid_database_ms"] = (time.perf_counter() - started) * 1000
             started = time.perf_counter()
             ranked, _ = reranker.rerank_with_confidence(query, hybrid, top_k=3)
@@ -130,7 +135,7 @@ def main():
             with (output / "results.jsonl").open("a", encoding="utf-8") as file:
                 file.write(json.dumps(row, ensure_ascii=False) + "\n")
             print(json.dumps({"index": index, "timings": timings, "metrics": row["metrics"]}), flush=True)
-        summary = {"n": len(rows), "label_scope": "12 synthetic single-source literal-anchor probes; not Recall or Answer Correctness",
+        summary = {"n": len(rows), "language": args.language, "label_scope": "12 synthetic single-source literal-anchor probes; not Recall or Answer Correctness",
                    "latency_ms": {key: distribution([row["timings"][key] for row in rows]) for key in rows[0]["timings"]},
                    "metrics": {mode: {metric: sum(row["metrics"][mode][metric] for row in rows)
                                       for metric in rows[0]["metrics"][mode]} for mode in modes},
