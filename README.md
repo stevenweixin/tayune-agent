@@ -109,4 +109,8 @@ python -m app.main
 模拟依赖压测与真实依赖顺序评测分开统计，不把429当成功、不把契约通过率当答案正确率。
 复现入口见[评测说明](tests/performance/README.md)，付费运行必须另外确认请求与费用上限。
 
+后续[中文修复复测报告](docs/public/ENGINEERING_RETEST_20261102_ZH.md)包含有界知识查询、
+语言兼容、拒答分类的修改及未解决的答案质量问题；[面试口述问答](docs/public/ENGINEERING_INTERVIEW_QA_ZH.md)
+按实际代码和测量边界组织，不将规则通过率冒充答案正确率。
+
 提交历史记录实际变更；修复日志保留问题、技术决策、验证证据与已知限制。

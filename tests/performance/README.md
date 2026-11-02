@@ -104,3 +104,34 @@ python -m tests.performance.summarize --base reports/engineering_20261102
 ```
 
 The public report is `docs/public/ENGINEERING_EVALUATION_20261102.md`.
+
+## Targeted Fix Retest
+
+The November 2 follow-up reads the five recorded CPU-contention tool-call pairs
+from the private baseline checkpoints in SQLite read-only mode:
+
+```sh
+python -m tests.performance.replay_knowledge_failures \
+  --baseline reports/engineering_20261102 --output reports/next_knowledge_replay
+```
+
+This runs real embedding/retrieval/rerank, with no paid model calls and no Milvus
+writes. Execution success is distinct from nonempty results or answer usefulness.
+The final follow-up evidence is `reports/retest_20261102/knowledge_replay_v2/`;
+the earlier language-filter preflight in `knowledge_replay/` is not the accepted
+version because it excluded the known legacy English metadata alias.
+
+The follow-up paid run used the same frozen cases and a NEW authorized budget,
+not `--previous` from the exhausted original 120-attempt run. Its report keeps the
+last budget-curtailed request separate. For this evidence layout:
+
+```sh
+python -m tests.performance.compare_retest \
+  --baseline reports/engineering_20261102 --retest reports/retest_20261102
+```
+
+The comparison excludes either batch's evaluation-budget-curtailed case before
+reporting matched counts. This remains one stochastic run per version, not a
+controlled statistical accuracy or latency-gain claim. Read the Chinese report
+`docs/public/ENGINEERING_RETEST_20261102_ZH.md`, especially the semantic failures
+that still passed the machine contract.

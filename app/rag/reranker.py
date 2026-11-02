@@ -149,7 +149,7 @@ class BGEReranker:
         confidence = top_results[0][1]
         return top_results, confidence
 
-def retrieve(query,retriever,reranker,source_type=None,recall_top_k=10,rerank_top_k=3):
+def retrieve(query,retriever,reranker,source_type=None,recall_top_k=10,rerank_top_k=3,language=None):
     """用普通函数串联召回和精排；模型由入口创建并复用。"""
     if type(rerank_top_k) is not int or rerank_top_k <=0:
         raise ValueError("rerank_top_k 必须是正整数")
@@ -157,7 +157,10 @@ def retrieve(query,retriever,reranker,source_type=None,recall_top_k=10,rerank_to
     started = perf_counter()
     logger.info("stage=recall status=start top_k=%d",recall_top_k)
     try:
-        candidates = retriever.search(query,top_k=recall_top_k,source_type=source_type)
+        search_options = {"top_k": recall_top_k, "source_type": source_type}
+        if language is not None:
+            search_options["language"] = language
+        candidates = retriever.search(query, **search_options)
     except Exception as error:
         # 这里只记异常类型；裸 raise 把原异常继续交给知识工具处理。
         # 不用 logger.exception，避免第三方异常堆栈携带 URL、请求内容等信息。

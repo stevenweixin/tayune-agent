@@ -18,11 +18,15 @@ WeightedRanker(0.7, 0.3)
   ↓
 返回 Document + score
 """
+import json
+
 from langchain_core.documents import Document
 from pymilvus import AnnSearchRequest, WeightedRanker
 
 from app.rag.hybrid_embeddings import HybridBGEmbeddings
 from app.rag.hybrid_vector_store import COLLECTION
+
+LANGUAGE_VALUES = {"en": ["en", "英语（en）"], "zh": ["zh", "中文"]}
 
 class HybridRetriever:
     def __init__(self,client,embeddings:HybridBGEmbeddings, collection_name=COLLECTION, knowledge_version="legacy", releases=None):
@@ -32,7 +36,8 @@ class HybridRetriever:
         self.knowledge_version = knowledge_version
         self.releases = releases
 
-    def search(self,query:str,top_k:int=10, source_type: str | None = None) -> list[tuple[Document,float]]:
+    def search(self,query:str,top_k:int=10, source_type: str | None = None,
+               language: str | None = None) -> list[tuple[Document,float]]:
         """两路各取 top_k 个候选,再融合选出最多 top_k 个不同记录."""
         if not isinstance(query,str) or not query.strip():
             raise ValueError("查询不能为空")
@@ -43,6 +48,13 @@ class HybridRetriever:
             if source_type not in ("article","brewing","policy"):
                 raise ValueError("无效的知识类型")
             expression += f' and source_type == "{source_type}"'
+        if language is not None:
+            if language not in LANGUAGE_VALUES:
+                raise ValueError("无效的知识语言")
+            # 语言存在metadata JSON中；检索前过滤，避免中文片段挤占英文候选。
+            # 已有审核数据使用这些明确别名；读取兼容，不重写或重建生产知识库。
+            accepted = json.dumps(LANGUAGE_VALUES[language], ensure_ascii=False)
+            expression += f' and metadata["language"] in {accepted}'
 
         # 文档和问题使用同一个双向量模型; 不读取就稠密集合
         dense, sparse = self.embeddings.encode_query(query)
