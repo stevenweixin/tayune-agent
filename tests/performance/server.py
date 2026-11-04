@@ -84,19 +84,20 @@ class DelayedCatalog(FixtureCatalog):
 
 
 class OfflineRuntime:
-    def __init__(self, output, model_delay=0.25, tool_delay=0.05):
+    def __init__(self, output, model_delay=0.25, tool_delay=0.05, max_sessions=100):
         self.output = output
         self.model_delay = model_delay
         self.tool_delay = tool_delay
         self.provider_attempts = 0
         self.fault = "none"
+        self.max_sessions = max_sessions
         self.cpu = CPUWorker()
         self.versions = {"models": "simulated", "knowledge": "fixture", "code": "engineering-baseline-v1"}
 
     async def start(self):
         self.output.mkdir(parents=True, exist_ok=False)
         setup_logging(self.output / "backend.log")
-        self.sessions = SessionStore(self.output / "sessions.sqlite3")
+        self.sessions = SessionStore(self.output / "sessions.sqlite3", max_sessions=self.max_sessions)
         self.runs = RunStore(self.sessions)
         self.sessions.runs = self.runs
         self.classifier = SimpleNamespace(classify=lambda text: {"label": "in_scope", "score": 1.0})

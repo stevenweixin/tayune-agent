@@ -40,7 +40,7 @@ class CPUWorker:
 
 class CPUQueue:
     """分类和RAG共享的有界队列，仍由CPUWorker保证一次只有一个推理线程。"""
-    def __init__(self, max_pending=16, timeout=35):
+    def __init__(self, max_pending=16, timeout=35, name="shared"):
         if type(max_pending) is not int or max_pending < 1 or timeout <= 0:
             raise ValueError("Invalid CPU queue limits")
         self.worker = CPUWorker()
@@ -50,6 +50,7 @@ class CPUQueue:
         self.pending = 0
         self.peak_pending = 0
         self.closed = False
+        self.name = name
 
     @property
     def busy(self):
@@ -78,9 +79,9 @@ class CPUQueue:
                     return await self.worker.run(function, *args)
                 finally:
                     # 只记录阶段和耗时，不保存参数、问题或无限增长的样本列表。
-                    logger.info("stage=cpu request=%s operation=%s queue_ms=%.1f run_ms=%.1f", run_id,
+                    logger.info("stage=cpu request=%s operation=%s queue_ms=%.1f run_ms=%.1f lane=%s", run_id,
                                 getattr(function, "__name__", "operation"),
-                                (entered - submitted) * 1000, (perf_counter() - entered) * 1000)
+                                (entered - submitted) * 1000, (perf_counter() - entered) * 1000, self.name)
         try:
             # 等待和执行共享期限；CPUWorker的shield仍保护实际推理线程。
             return await asyncio.wait_for(execute(), timeout=self.timeout)

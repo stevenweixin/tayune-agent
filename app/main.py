@@ -27,7 +27,9 @@ def create_app(runtime_factory = Runtime):
             await runtime.start()
             app.state.runtime = runtime
             app.state.service = TeaService(runtime, int(os.getenv("TAYUNE_DAILY_REQUEST_LIMIT", "20")),
-                                           max_concurrent=getattr(runtime, "max_concurrent_chats", 4))
+                                           max_concurrent=getattr(runtime, "max_concurrent_chats", 4),
+                                           max_waiting=getattr(runtime, "max_waiting_chats", 0),
+                                           wait_seconds=getattr(runtime, "admission_wait_seconds", 2))
             yield
         finally:
             await runtime.close()
@@ -110,8 +112,10 @@ def create_app(runtime_factory = Runtime):
                 result = await request.app.state.service.chat(token,body.message.strip())
         except LookupError:
             raise HTTPException(401, "Session expired") from None
-        except RuntimeError:
-            raise HTTPException(429, "Assistant is busy or its request limit was reached") from None
+        except RuntimeError as error:
+            retry = str(error) in {"busy", "session_busy", "admission_queue_full", "admission_timeout"}
+            raise HTTPException(429, "Assistant is busy or its request limit was reached",
+                                headers={"Retry-After": "2"} if retry else None) from None
         except ValueError as error:
             if str(error) == "stale_request_result":
                 raise HTTPException(409, "Earlier evidence expired; send a new request to verify current information") from None

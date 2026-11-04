@@ -25,34 +25,60 @@ from pathlib import Path
 
 
 class SessionStore:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, max_sessions=100, cleanup_interval=60):
+        # Runtime选择服务容量；默认100保留直接构造调用者的旧行为。
+        if type(max_sessions) is not int or not 1 <= max_sessions <= 100000:
+            raise ValueError("Invalid session capacity")
+        if not 1 <= cleanup_interval <= 3600:
+            raise ValueError("Invalid cleanup interval")
+        self.max_sessions = max_sessions
+        self.cleanup_interval = cleanup_interval
+        self.next_cleanup = 0.0
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path)
         os.chmod(path, 0o600)
+        # WAL改善读写互扰；仍是单进程、单写者，不降低synchronous持久性设置。
+        self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, updated REAL, data TEXT)")
         self.db.execute("CREATE TABLE IF NOT EXISTS budget (day TEXT PRIMARY KEY, count INTEGER)")
+        self.db.execute("CREATE INDEX IF NOT EXISTS sessions_updated ON sessions(updated)")
         self.db.commit()
         self.runs = None
 
     def cleanup(self):
+        # 全局清理只定期执行，避免3000个被拒请求各自扫描/提交所有历史表。
+        if time.monotonic() < self.next_cleanup:
+            return False
         if self.runs is not None:
             self.runs.cleanup()
         self.db.execute("DELETE FROM sessions WHERE updated < ?", (time.time() - 86400,))
         self.db.commit()
+        self.next_cleanup = time.monotonic() + self.cleanup_interval
+        return True
 
     def create(self):
         self.cleanup()
-        if self.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] >= 100:
-            raise RuntimeError("会话已满")
         token = secrets.token_urlsafe(32)
-        self.save(token, {"summary": "", "history": [], "known_product_ids": [], "last_request": 0,
-                          "preferences": {}})
+        now = time.time()
+        data = {"summary": "", "history": [], "known_product_ids": [], "last_request": 0, "preferences": {}}
+        # 容量检查和插入同一条SQL；只计未过期会话，不等待定期清理腾位置。
+        with self.db:
+            cursor = self.db.execute("""INSERT INTO sessions(token,updated,data)
+                SELECT ?,?,? WHERE (SELECT COUNT(*) FROM sessions WHERE updated>=?) < ?""",
+                (token, now, json.dumps(data), now - 86400, self.max_sessions))
+            if cursor.rowcount != 1:
+                raise RuntimeError("会话已满")
         return token
 
     def get(self, token):
-        self.cleanup()
-        row = self.db.execute("SELECT data FROM sessions WHERE token = ?", (token,)).fetchone()
-        return json.loads(row[0]) if row else None
+        row = self.db.execute("SELECT updated,data FROM sessions WHERE token = ?", (token,)).fetchone()
+        if not row:
+            return None
+        if row[0] < time.time() - 86400:
+            # 清理节流不能延长令牌有效期；访问过期会话立即删除其私有历史/轨迹。
+            self.delete(token)
+            return None
+        return json.loads(row[1])
 
     def save(self, token, data):
         self.db.execute("INSERT OR REPLACE INTO sessions VALUES (?, ?, ?)",

@@ -25,10 +25,10 @@ CHAT_TIMEOUT_SECONDS = 85
 
 
 class TeaService:
-    def __init__(self, runtime, daily_limit=20, max_concurrent=4):
+    def __init__(self, runtime, daily_limit=20, max_concurrent=4, max_waiting=0, wait_seconds=2):
         self.runtime = runtime
         self.daily_limit = daily_limit
-        self.requests = RequestCoordinator(max_concurrent)
+        self.requests = RequestCoordinator(max_concurrent, max_waiting, wait_seconds)
         self.active = {}
 
     async def chat(self, token, question, request_key=None):
@@ -54,7 +54,11 @@ class TeaService:
                 raise RuntimeError("task_in_progress_or_interrupted")
         if time.time() - data["last_request"] < 8:
             raise RuntimeError("rate_limit")
-        with self.requests.slot():
+        async with self.requests.admit():
+            # 等待期间可能跨过会话有效期；未获得执行名额之前不登记任务、不扣日次数。
+            data = self.runtime.sessions.get(token)
+            if data is None:
+                raise LookupError("session_expired")
             execution = None
             marker = None
             if runs:
@@ -112,7 +116,8 @@ class TeaService:
             history.append(message_type(content=item["text"]))
         history.append(HumanMessage(content=question))
         # 分类器是风险信号，高分也可能错；既不按分数强行放行，也不写tea pet关键词例外。
-        classification = await self.runtime.cpu.run(self.runtime.classifier.classify, question)
+        classifier_cpu = getattr(self.runtime, "classifier_cpu", self.runtime.cpu)
+        classification = await classifier_cpu.run(self.runtime.classifier.classify, question)
         trace = ["classifier:" + classification["label"]]
         initial_model_count = 0
         review_usage = {"input_tokens": 0, "output_tokens": 0}
@@ -242,11 +247,13 @@ class TeaService:
                 raise ValueError("start_new_request_to_refresh_evidence")
             return saved["result"]
         # 只恢复最近60秒、相同版本的节点边界。陈旧商品证据必须新请求重新核验。
-        if (saved["status"] not in ("interrupted", "timed_out") or not saved["checkpoint"]
+        def valid_checkpoint():
+            return not (saved["status"] not in ("interrupted", "timed_out") or not saved["checkpoint"]
                 or time.time() - saved["checkpoint"].get("evidence_started_at", 0) > 60
                 or saved["checkpoint"].get("session_revision") != data["last_request"]
                 or saved["checkpoint"].get("memory_revision", 0) != data.get("memory_revision", 0)
-                or saved["versions"] != (self.runtime.snapshot_versions() if hasattr(self.runtime, "snapshot_versions") else self.runtime.versions)):
+                or saved["versions"] != (self.runtime.snapshot_versions() if hasattr(self.runtime, "snapshot_versions") else self.runtime.versions))
+        if not valid_checkpoint():
             raise ValueError("start_new_request_to_refresh_evidence")
         state = decode_state(saved["checkpoint"])
         state["resume_node"] = saved["next_node"]
@@ -254,7 +261,10 @@ class TeaService:
         for item in state["dialogue"]:
             kind = HumanMessage if item["role"] == "human" else AIMessage
             history.append(kind(content=item["text"]))
-        with self.requests.slot():
+        async with self.requests.admit():
+            # 短等待也可能使证据超过60秒，不在排队后恢复过期价格或政策。
+            if self.runtime.sessions.get(token) is None or not valid_checkpoint():
+                raise ValueError("start_new_request_to_refresh_evidence")
             runs.claim_resume(run_id)
             execution = Execution(run_id, runs, saved["versions"], **saved["counters"])
             marker = CURRENT_RUN.set(execution)

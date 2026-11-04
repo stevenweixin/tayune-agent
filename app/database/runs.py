@@ -28,6 +28,9 @@ class RunStore:
             CREATE TABLE IF NOT EXISTS execution_events (
                 run_id TEXT NOT NULL, time REAL NOT NULL, kind TEXT NOT NULL, details TEXT NOT NULL
             );
+            CREATE INDEX IF NOT EXISTS task_runs_updated ON task_runs(updated);
+            CREATE INDEX IF NOT EXISTS task_runs_owner ON task_runs(owner);
+            CREATE INDEX IF NOT EXISTS execution_events_run ON execution_events(run_id);
         """)
         # 本服务仅支持一个进程；重启时旧 running 不能冒充仍在执行。
         self.db.execute("UPDATE task_runs SET status='interrupted' WHERE status='running'")

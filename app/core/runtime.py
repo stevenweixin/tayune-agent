@@ -20,7 +20,7 @@ from app.agent.knowledge_tool import build_knowledge_tool
 from app.agent.graph import build_graph
 from app.agent.intent_review import IntentReviewer
 from app.core.cpu_worker import CPUQueue
-from app.core.concurrency import read_chat_capacity
+from app.core.concurrency import read_capacity_settings
 from app.database.session import SessionStore
 from app.database.runs import RunStore
 from app.integrations.model_gateway import ModelGateway
@@ -37,7 +37,9 @@ class Runtime:
         self.sync_http = None
         self.milvus = None
         self.sessions = None
-        self.cpu = CPUQueue()
+        self.cpu = CPUQueue(name="rag")
+        # 两类模型各自串行，避免短分类排在长Rerank后；不是物理CPU资源独占。
+        self.classifier_cpu = CPUQueue(max_pending=32, timeout=5, name="classifier")
         self.classifier = None
         self.graph = None
         self.intent_reviewer = None
@@ -48,11 +50,14 @@ class Runtime:
     async def start(self):
         # 只在服务入口加载，环境变量优先，兼容已完成Milvus配置读取函数。
         load_dotenv(ROOT / ".env", override=False) # override=False:如果环境变量已存在,不覆盖。部署时服务器设置的环境变量优先于本地文件。
-        self.max_concurrent_chats = read_chat_capacity()
+        settings = read_capacity_settings()
+        self.max_concurrent_chats = settings["max_concurrent_chats"]
+        self.max_waiting_chats = settings["max_waiting_chats"]
+        self.admission_wait_seconds = settings["admission_wait_seconds"]
         config = read_config()
         self.http = httpx.AsyncClient(trust_env=False)
         self.sync_http = httpx.Client(trust_env=False)
-        self.sessions = SessionStore(self.session_path)
+        self.sessions = SessionStore(self.session_path, max_sessions=settings["max_sessions"])
         self.runs = RunStore(self.sessions)
         self.sessions.runs = self.runs
         self.sessions.cleanup()
@@ -141,6 +146,7 @@ class Runtime:
                 await self.cleanup_task
             except asyncio.CancelledError:
                 pass
+        await self.classifier_cpu.close()
         await self.cpu.close()
         if self.milvus is not None:
             self.milvus.close()

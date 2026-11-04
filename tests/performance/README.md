@@ -4,6 +4,29 @@ These runners never target the public website or production port 8011. They use
 loopback 8012 and separate SQLite files under `reports/`. They do not change
 production `.env`, website switches, quotas, or Milvus records.
 
+## Capacity Foundation Verification
+
+```sh
+python -m tests.performance.verify_capacity_foundation --output reports/next_foundation
+# Optional simulated3000-user ramp and spike, never a paid provider test:
+python -m tests.performance.verify_capacity_foundation --output reports/next_foundation_load \
+  --load-python reports/loadgen_20261104/bin/python
+```
+
+This fixture runtime binds the same validated capacity settings to the formal
+SessionStore, TeaService, admission coordinator and classifier/RAG CPU queues.
+It registers3000 sessions through the actual HTTP route; there is NO seeding route.
+The8 checks verify registration, eight completed chats with only four active slots,
+waiting, quota, task uniqueness, cleanup and idempotent replay. All external and
+local model dependencies are fixtures. Isolated IP/daily limits are raised only
+in this subprocess. Source hashes, invalid first-run input and raw outcomes are retained.
+
+The existing --real-retrieval verifier loads actual local models/Milvus but stubs
+every model role and the catalog. Its manually constructed Service intentionally
+keeps max_waiting=0 for legacy rejection checks; it is not the new queued-default test.
+Neither command changes production DB/.env/Tunnel or proves human answer accuracy.
+See [capacity foundation implementation and results](../../docs/public/CAPACITY_FOUNDATION_20261104_ZH.md).
+
 ## 3000 Virtual Users and Real Answer Quality
 
 ```sh
