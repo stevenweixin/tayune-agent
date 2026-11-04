@@ -4,6 +4,43 @@ These runners never target the public website or production port 8011. They use
 loopback 8012 and separate SQLite files under `reports/`. They do not change
 production `.env`, website switches, quotas, or Milvus records.
 
+## 3000 Virtual Users and Real Answer Quality
+
+```sh
+# Separate load-generator venv, never install Locust into the business/course environment.
+python -m venv reports/next_loadgen
+reports/next_loadgen/bin/python -m pip install -r tests/performance/requirements.txt
+python -m tests.performance.run_scale --output reports/next_scale/simulated_run2 \
+  --load-python reports/next_loadgen/bin/python
+# NEW paid authorization required: at most48 chats /192 physical attempts /estimated USD1.
+python -m tests.performance.run_quality_load --output reports/next_scale/quality --paid
+# Review all answers against frozen_cases.json, then save quality_review.json at next_scale root.
+# Its cases contain profile/id/verdict/note, with verdict meets/partial/failed/clarification.
+python -m tests.performance.analyze_scale_quality --input reports/next_scale
+```
+
+The scale runner first exercises the formal100-session cap with3000 registration
+attempts. It then EXPLICITLY bypasses create() only to seed the isolated DB, so the
+3000-user chat stages are NOT proof of successful public registration. Formal chat
+admission stays4; CPU queue and per-session cooldown stay enabled. All dependencies
+are fixtures. It runs short ramps10/50/100/300/1000/3000 and a one-shot3000-user barrier.
+Only loopback8012 is allowed; benchmark endpoints never exist in the production app.
+
+The generator streams measurements to JSONL and records achieved users; check those
+files and summary, not only process exit codes. Locust exit1 is expected when429 is
+marked business failure. Missing metadata/zero traffic is a harness failure, not a pass.
+Keep the venv interpreter path WITHOUT resolving its symlink into the base interpreter.
+The first load-generator startup failure is preserved in the November4 report.
+
+The real runner compares the same24 regression cases sequentially and at4 concurrent
+requests using actual local models, Milvus reads, catalog reads and DeepSeek. No mock
+3000-user score is presented as real answer accuracy. Both workloads are on one
+physical machine; no public Tunnel or distributed generator result is implied.
+Real output keeps task IDs, actual tool results, SSE delivery integrity, latency and
+cross-role physical usage. Cases/rubrics are frozen before requests. Review is not
+independent human gold; order/cache/model randomness prevent causal attribution.
+See the [Chinese scale and quality report](../../docs/public/SCALE_QUALITY_EVALUATION_20261104_ZH.md).
+
 ## Full Formal Agent Evaluation
 
 ```sh
