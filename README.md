@@ -119,6 +119,10 @@ python -m app.main
 后续[正式并发控制](docs/public/CONCURRENCY_CONTROL.md)已替换单请求锁：不同会话默认4路、
 同会话互斥、CPU有界排队，并补齐记忆管理/恢复/取消保护。仍是单进程；实现当轮未重启生产进程或调用真实模型。
 
+2026-11-05：[共享状态与租约底座](docs/public/SHARED_STATE_FOUNDATION_20261105_ZH.md)
+已通过23项真实PostgreSQL契约及独立进程竞争/崩溃接管验证。
+这是待接线的异步后端，不是正式API已多实例运行；当前仍不可直接增加Uvicorn workers。
+
 最新[正式版本完整评测](docs/public/FULL_AGENT_EVALUATION_20261102_ZH.md)已在隔离实例完成真实依赖验收：
 63条功能请求规则契约59条通过，逐题复核另列部分完成/未完成，不作为答案准确率；
 4人同时提问4条完成，8人同时提问完成4条、拒绝4条。没有覆盖持续高并发或公网SLA，生产配置不变。

@@ -4,6 +4,25 @@ These runners never target the public website or production port 8011. They use
 loopback 8012 and separate SQLite files under `reports/`. They do not change
 production `.env`, website switches, quotas, or Milvus records.
 
+## Shared-State Foundation Verification
+
+```sh
+python3.11 -m venv reports/shared-state-venv
+reports/shared-state-venv/bin/python -m pip install -r requirements-capacity.txt
+reports/shared-state-venv/bin/python -m tests.performance.verify_shared_state \
+  --output reports/next_shared_state
+```
+
+This additional runner needs Docker with an existing postgres:15-alpine image.
+It starts a dedicated loopback25432 database, random temporary credentials and
+private data below reports/, then removes only its own container/network on exit.
+It never connects to the course5433 database, production SQLite or paid providers.
+Eight independent Python processes test shared slots; another is killed to verify
+lease expiry/takeover. Contracts also cover fencing, quota rollback and replay.
+This is NOT the formal API, complete Agent multi-instance execution or throughput.
+The async backend is not wired into Runtime/Execution yet; do not increase workers.
+See [shared-state status and remaining gates](../../docs/public/SHARED_STATE_FOUNDATION_20261105_ZH.md).
+
 ## Capacity Foundation Verification
 
 ```sh

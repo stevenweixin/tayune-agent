@@ -1,0 +1,20 @@
+# Isolated verification only. Not a production deployment or a course database.
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: tayune-capacity-postgres-test
+    environment:
+      POSTGRES_USER: tayune_capacity_test
+      POSTGRES_DB: tayune_capacity_test
+      POSTGRES_PASSWORD: ${TAYUNE_STATE_TEST_PASSWORD:?Required ephemeral test password}
+    ports:
+      - "127.0.0.1:25432:5432"
+    volumes:
+      - ${TAYUNE_STATE_TEST_DATA:?Required new reports directory}:/var/lib/postgresql/data
+    command: ["postgres", "-c", "max_connections=64", "-c", "shared_buffers=64MB"]
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tayune_capacity_test -d tayune_capacity_test"]
+      interval: 1s
+      timeout: 2s
+      retries: 30

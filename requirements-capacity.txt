@@ -1,0 +1,3 @@
+# Optional shared-state verification; install in an isolated reports/ venv first.
+# Matches the PostgreSQL driver version already declared in requirements.txt.
+asyncpg==0.30.0
