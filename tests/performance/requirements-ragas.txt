@@ -1,0 +1,9 @@
+# Optional evaluator only; never upgrade the application/ML environment for RAGAS.
+ragas==0.4.3
+openai==2.54.0
+httpx==0.28.1
+instructor==1.14.5
+langchain==1.2.10
+langchain-core==1.2.16
+langchain-openai==1.1.10
+python-dotenv==1.0.1

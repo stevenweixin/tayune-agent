@@ -4,6 +4,37 @@ These runners never target the public website or production port 8011. They use
 loopback 8012 and separate SQLite files under `reports/`. They do not change
 production `.env`, website switches, quotas, or Milvus records.
 
+## RAGAS Historical Answer Evaluation
+
+Install the optional evaluator in its own venv; do not upgrade the business/ML
+environment for RAGAS. The first baseline scores archived real answers and actual
+model-visible tool evidence, not fresh Agent generations or public website traffic.
+Reference drafts and private archives are not distributed with the repository.
+
+```sh
+python3.11 -m venv reports/ragas-venv
+reports/ragas-venv/bin/python -m pip install -r tests/performance/requirements-ragas.txt
+# Requires a NEW paid authorization. The November12 run is already complete.
+reports/ragas-venv/bin/python -m tests.performance.run_ragas \
+  --archive reports/scale_quality_20261104/quality/answers.jsonl \
+  --references reports/ragas_20261112/references.json \
+  --output reports/next_ragas --ledger reports/authorized_ragas_ledger.jsonl \
+  --ml-python /path/to/existing-ml-env/bin/python --model-path /path/to/local/bge-m3 --paid
+# Read-only aggregation, no model calls:
+python -m tests.performance.summarize_ragas --input reports/ragas_20261112/run1
+```
+
+The physical transport counts SDK/instructor attempts, limits calls250 and a
+conservative USD0.50, reserves inflight worst-case costs, and stops on unknown usage.
+Reopening a ledger preserves consumption; do not create new ledgers to evade an
+authorization ceiling. Official DeepSeek HTTPS only, no paid embedding endpoint.
+BGE-M3 runs read-only in a separate existing ML interpreter, with downloads disabled.
+Prompt-request hashes, labels, response/context hashes, dependency versions and raw judgments are
+retained privately. N/A and execution errors are separate, never silently replaced
+with zeros. Reference-based recall is not Recall@K; faithfulness is not correctness.
+Multi-turn text projections and same-family judges have additional limitations.
+See [Chinese RAGAS baseline and failure analysis](../../docs/public/RAGAS_BASELINE_20261112_ZH.md).
+
 ## Shared-State Foundation Verification
 
 ```sh
